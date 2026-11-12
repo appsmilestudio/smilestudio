@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2, Clock, Calendar, Stethoscope, ArrowLeft } from "lucide-react";
 import { doctorById, formatDay, formatTime, type VisitStatus } from "@/lib/smile/model";
+import { startLibroSync } from "@/lib/smile/cloud";
 import { useSmileStore } from "@/lib/smile/store";
 import { Btn } from "@/components/smile/ui";
 
@@ -18,7 +19,7 @@ function ConfirmPage() {
   const [done, setDone] = useState<VisitStatus | null>(null);
 
   useEffect(() => {
-    void Promise.resolve(useSmileStore.persist.rehydrate()).finally(() => setReady(true));
+    void startLibroSync().finally(() => setReady(true));
   }, []);
 
   return (

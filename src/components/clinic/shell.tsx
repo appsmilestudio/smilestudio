@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { Download, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { patientLabel, TABS, type Patient, type SurfaceId, type TabId, type Tool } from "@/lib/clinic/model";
 import { useClinic } from "@/lib/clinic/store";
+import { startFichasSync } from "@/lib/smile/cloud";
 import { FichaSheet } from "./ficha";
 import { MarkImg, StudioLogo } from "./mark";
 import { OdontogramaSheet } from "./odontograma";
@@ -13,7 +14,7 @@ import "./clinic.css";
 export function ClinicApp() {
   const hydrated = useClinic((s) => s.hydrated);
   useEffect(() => {
-    void Promise.resolve(useClinic.persist.rehydrate()).finally(() => {
+    void startFichasSync().finally(() => {
       useClinic.getState().setHydrated();
     });
   }, []);

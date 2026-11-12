@@ -9,11 +9,12 @@ import { People } from "./people";
 import { Panels, type Panel } from "./panels";
 import { HomeDashboard } from "./home";
 import { RoleSelector } from "./role-selector";
-import { exportExcelWorkbook } from "@/lib/smile/excel";
+import { ClinicApp } from "@/components/clinic/shell";
 import { applyWhatsAppLead } from "@/lib/smile/apply-lead";
+import { startLibroSync, useCloudStatus } from "@/lib/smile/cloud";
+import { exportExcelWorkbook } from "@/lib/smile/excel";
 import { ackWhatsAppInbox, listWhatsAppInbox } from "@/lib/smile/whatsapp";
 import { Btn, DayNav } from "./ui";
-import { ClinicApp } from "@/components/clinic/shell";
 
 type Tab = "inicio" | "hoy" | "pacientes" | "caja" | "deudas" | "fichas";
 
@@ -46,12 +47,15 @@ export function SmileApp() {
   const [panel, setPanel] = useState<Panel | null>(null);
   const [askReset, setAskReset] = useState(false);
   const [waNotice, setWaNotice] = useState("");
+  const [ready, setReady] = useState(false);
+  const cloud = useCloudStatus();
 
   useEffect(() => {
-    void Promise.resolve(useSmileStore.persist.rehydrate());
+    void startLibroSync().finally(() => setReady(true));
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
     let stop = false;
     async function pull() {
       try {
@@ -70,9 +74,18 @@ export function SmileApp() {
       stop = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [ready]);
 
   const activeDate = tab === "caja" ? cajaDate : boardDate;
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-cream text-ink">
+        <img src="/clinic-mark.png" alt="Smile Studio" className="mark-in size-16 object-contain" />
+        <p className="mt-4 text-sm text-muted">{cloud.detail}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -93,6 +106,7 @@ export function SmileApp() {
               <div className="min-w-0">
                 <p className="truncate font-display text-2xl leading-none text-ink sm:text-3xl">Smile Studio</p>
                 <p className="mt-1 hidden truncate text-xs text-muted sm:block">Consultorio dental · Piura</p>
+                <p className={`truncate text-[11px] ${cloud.status === "conectado" ? "text-muted" : "text-gold-deep"}`}>{cloud.detail}</p>
               </div>
             </button>
             <nav
