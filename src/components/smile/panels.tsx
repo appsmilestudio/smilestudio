@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { previewPathPrefix } from "@/lib/preview-path-prefix";
 import { cpeNumber, openReceipt } from "@/lib/smile/cpe";
 import {
@@ -11,6 +11,7 @@ import {
   STATUS_LABEL,
   TREATMENTS,
   doctorById,
+  fold,
   formatDay,
   formatTime,
   needsMorningPing,
@@ -323,7 +324,6 @@ function VisitSheet({
           </div>
           <ul className="space-y-2">
             {visit.payments.map((payment) => {
-              const missing = payment.method !== "efectivo" && (!payment.hasEvidence || !payment.operation);
               return (
                 <li key={payment.id} className="rounded-2xl border border-line px-3 py-3">
                   <div className="flex items-start justify-between gap-2">
@@ -335,18 +335,20 @@ function VisitSheet({
                         {payment.operation ? `Op. ${payment.operation}` : "Sin número de operación"}
                         {payment.note ? ` · ${payment.note}` : ""}
                       </p>
-                      {missing ? <p className="text-sm text-alert">Falta evidencia para cuadrar.</p> : <p className="text-sm text-moss">Evidencia lista</p>}
+                      {payment.operation ? (
+                        <p className="text-xs text-muted">Op. {payment.operation}</p>
+                      ) : null}
                     </div>
                     {!locked ? (
                       <button
                         type="button"
-                        className="text-sm text-alert"
+                        className="text-sm text-alert hover:underline"
                         onClick={() => {
                           const message = removePayment(visit.id, payment.id);
                           if (message) setError(message);
                         }}
                       >
-                        Quitar
+                        Eliminar pago
                       </button>
                     ) : null}
                   </div>
@@ -366,16 +368,12 @@ function VisitSheet({
                   setError("Escribe el monto cobrado.");
                   return;
                 }
-                if (method !== "efectivo" && (!seen || !operation.trim())) {
-                  setError("Yape, Plin y POS necesitan el número de operación y marcar el comprobante.");
-                  return;
-                }
                 addPayment(visit.id, {
                   method,
                   amount: value,
                   operation: operation.trim(),
                   note: payNote.trim(),
-                  hasEvidence: method === "efectivo" || seen,
+                  hasEvidence: true,
                   evidence,
                 });
                 setAmount("");
@@ -632,12 +630,27 @@ function BookingSheet({
   const [address, setAddress] = useState("");
   const [treatment, setTreatment] = useState(doctorId === "miguel" ? "Sesión de endodoncia" : "Consulta");
   const [error, setError] = useState("");
-  const matches =
-    query.trim().length < 2
-      ? []
-      : patients
-          .filter((patient) => patient.fullName.toLowerCase().includes(query.trim().toLowerCase()) || patient.phone.includes(query.replace(/\D/g, "")))
-          .slice(0, 5);
+  const matches = useMemo(() => {
+    const raw = query.trim();
+    if (raw.length < 2) return [];
+    const tokens = fold(raw).replace(/[,.-]/g, " ").split(/\s+/).filter(Boolean);
+    const digits = raw.replace(/\D/g, "");
+    return patients
+      .filter((p) => {
+        if (digits.length >= 2 && p.dni.includes(digits)) return true;
+        if (digits.length >= 3 && p.phone.replace(/\D/g, "").includes(digits)) return true;
+        if (tokens.length > 0) {
+          const norm = fold(p.fullName).replace(/[,.-]/g, " ");
+          const normSZ = norm.replace(/z/g, "s");
+          return tokens.every((t: string) => {
+            if (norm.includes(t)) return true;
+            return normSZ.includes(t.replace(/z/g, "s"));
+          });
+        }
+        return false;
+      })
+      .slice(0, 6);
+  }, [patients, query]);
 
   return (
     <Sheet title={title} subtitle={subtitle} onClose={onClose}>

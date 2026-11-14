@@ -235,11 +235,12 @@ export function SmileApp() {
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium tracking-wide text-gold-deep uppercase">Horario</p>
-            <p className="mt-2 text-sm">Lunes a sábado</p>
+            <p className="text-xs font-medium tracking-wide text-gold-deep uppercase">Contacto & Horario</p>
+            <p className="mt-2 text-sm font-semibold text-ink">WhatsApp: +51 949 390 316</p>
+            <p className="text-sm">Lunes a sábado</p>
             <p className="text-sm text-muted">10:00 a. m. – 12:00 p. m.</p>
             <p className="text-sm text-muted">5:00 p. m. – 7:30 p. m.</p>
-            <p className="mt-2 text-sm text-muted">Domingo cerrado</p>
+            <p className="mt-1 text-sm text-muted">Domingo cerrado</p>
           </div>
           <div>
             <p className="text-xs font-medium tracking-wide text-gold-deep uppercase">Este dispositivo & Excel</p>

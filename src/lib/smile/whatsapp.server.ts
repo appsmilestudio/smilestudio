@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import { env } from "@/lib/env.server";
 
-export const WHATSAPP_TEST_TO = "51928544342";
-export const WHATSAPP_TEST_DISPLAY = "928 544 342";
+export const WHATSAPP_TEST_TO = "51949390316";
+export const WHATSAPP_TEST_DISPLAY = "949 390 316";
 
 const GRAPH = "https://graph.facebook.com/v23.0";
 const TEMPLATE = "cita_smile_studio";

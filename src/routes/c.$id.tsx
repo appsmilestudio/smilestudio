@@ -85,8 +85,16 @@ function ConfirmPage() {
           ) : null}
 
           {done === "reprogramada" || visit.status === "reprogramada" ? (
-            <div className="rise mt-5 rounded-2xl bg-gold-soft p-4 text-sm font-medium text-gold-deep">
-              Solicitud recibida. Recepción se comunicará contigo por WhatsApp para coordinar otro horario.
+            <div className="rise mt-5 rounded-2xl bg-gold-soft p-4 text-sm font-medium text-gold-deep space-y-2">
+              <p>Solicitud recibida. Puedes escribir directamente a recepción para coordinar otro horario:</p>
+              <a
+                href={`https://wa.me/51949390316?text=${encodeURIComponent(`Hola Smile Studio, soy ${patient.fullName}. Quisiera reprogramar mi cita del ${formatDay(visit.date)}.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl bg-moss px-4 py-2 text-xs font-semibold text-paper hover:opacity-90"
+              >
+                Escribir a WhatsApp Recepción (949 390 316)
+              </a>
             </div>
           ) : null}
 
