@@ -1,8 +1,6 @@
 import { useMemo } from "react";
 import {
   Calendar,
-  Clock,
-  UserCheck,
   Wallet,
   PhoneCall,
   PlusCircle,
@@ -10,11 +8,8 @@ import {
   ArrowRight,
   Sparkles,
   Stethoscope,
-  AlertTriangle,
   Receipt,
-  Users,
 } from "lucide-react";
-import { cn } from "@/lib/cn";
 import {
   DOCTORS,
   STATUS_LABEL,

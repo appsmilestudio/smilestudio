@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckCircle2, Clock, Calendar, Stethoscope, ArrowLeft } from "lucide-react";
+import { CheckCircle2, Calendar, Stethoscope, ArrowLeft } from "lucide-react";
 import { doctorById, formatDay, formatTime, type VisitStatus } from "@/lib/smile/model";
 import { startLibroSync } from "@/lib/smile/cloud";
 import { useSmileStore } from "@/lib/smile/store";

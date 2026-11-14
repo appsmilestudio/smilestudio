@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
-import { formatDay, isSunday, latestOnOrBefore, limaToday, nextOpenDay, type DoctorId, type Role } from "@/lib/smile/model";
+import { formatDay, isSunday, latestOnOrBefore, limaToday, nextOpenDay, type DoctorId } from "@/lib/smile/model";
 import { useSmileStore } from "@/lib/smile/store";
 import { Board } from "./board";
 import { Caja } from "./caja";

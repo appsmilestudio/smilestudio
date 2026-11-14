@@ -3,9 +3,6 @@ import {
   fold,
   slug,
   uid,
-  formatDay,
-  formatTime,
-  soles,
   type Debt,
   type DoctorId,
   type Patient,
@@ -29,7 +26,7 @@ function excelSerialToIso(val: unknown, lastDate = "2026-10-01"): string {
     const trimmed = val.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
     // Formatos como "01/10/2026" o "1/10/2026"
-    const match = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const match = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
     if (match) {
       const d = match[1].padStart(2, "0");
       const m = match[2].padStart(2, "0");

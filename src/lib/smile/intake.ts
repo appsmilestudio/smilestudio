@@ -108,7 +108,7 @@ function readDate(text: string, today: string) {
       return isSunday(day) ? shiftDay(day, 1) : day;
     }
   }
-  const numeric = text.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  const numeric = text.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
   if (numeric) {
     const day = Number(numeric[1]);
     const month = Number(numeric[2]);
@@ -175,7 +175,7 @@ export function parseBooking(
   const when = readTime(body);
   const notes: string[] = [];
   if (body) notes.push(body);
-  let time = when.time;
+  const time = when.time;
   if (when.raw && !time) notes.unshift(`Pidió ${when.raw}, fuera del horario del consultorio.`);
   const date = readDate(body, today);
   return {

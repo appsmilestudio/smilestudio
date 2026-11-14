@@ -3,7 +3,7 @@ import { Users, Stethoscope, ShieldCheck, ChevronDown, Check } from "lucide-reac
 import { cn } from "@/lib/cn";
 import type { Role } from "@/lib/smile/model";
 
-export const ROLES: {
+const ROLES: {
   id: Role;
   label: string;
   desc: string;

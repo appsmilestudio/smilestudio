@@ -1,0 +1,16 @@
+{
+  "name": "Smile Studio",
+  "short_name": "Smile Studio",
+  "description": "Sistema de gestión clínica odontológica Smile Studio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f7f1e6",
+  "icons": [
+    {
+      "src": "/clinic-mark.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ]
+}

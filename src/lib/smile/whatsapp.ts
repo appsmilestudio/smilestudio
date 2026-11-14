@@ -9,7 +9,7 @@ export type CitaWhatsAppInput = {
 };
 
 export const sendCitaWhatsApp = createServerFn({ method: "POST" })
-  .inputValidator((data: CitaWhatsAppInput) => data)
+  .validator((data: CitaWhatsAppInput) => data)
   .handler(async ({ data }) => {
     const { sendCita } = await import("./whatsapp.server");
     return sendCita(data);
@@ -22,7 +22,7 @@ export const whatsappStatus = createServerFn({ method: "POST" }).handler(async (
 });
 
 export const saveWhatsAppConnection = createServerFn({ method: "POST" })
-  .inputValidator((data: { phoneNumberId: string; token: string }) => data)
+  .validator((data: { phoneNumberId: string; token: string }) => data)
   .handler(async ({ data }) => {
     const { saveWhatsAppSecrets } = await import("./whatsapp.server");
     return saveWhatsAppSecrets(data.phoneNumberId, data.token);
@@ -45,7 +45,7 @@ export const listWhatsAppInbox = createServerFn({ method: "POST" }).handler(asyn
 });
 
 export const ackWhatsAppInbox = createServerFn({ method: "POST" })
-  .inputValidator((data: { ids: string[] }) => data)
+  .validator((data: { ids: string[] }) => data)
   .handler(async ({ data }) => {
     const { ackInbox } = await import("./inbox.server");
     ackInbox(data.ids);

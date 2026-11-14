@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Search, X, UserPlus, Users, Download, Upload, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { Search, X, UserPlus, Users, Download, Upload, CheckCircle2 } from "lucide-react";
 import { fold, prettyPhone, type Debt, type Patient, type Visit } from "@/lib/smile/model";
 import { exportExcelWorkbook, parseExcelWorkbook } from "@/lib/smile/excel";
 import { useSmileStore } from "@/lib/smile/store";
