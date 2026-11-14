@@ -38,18 +38,51 @@ export function People({
     }
     return map;
   }, [visits]);
-  const needle = fold(query);
-  const rows = patients
-    .filter((patient) => {
-      if (onlyDebt && !debtIds.has(patient.id)) return false;
-      if (!needle) return true;
-      return (
-        fold(patient.fullName).includes(needle) ||
-        patient.dni.includes(query.trim()) ||
-        patient.phone.includes(query.replace(/\D/g, ""))
-      );
-    })
-    .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+  // Búsqueda inteligente por tokens y flexibilidad fonética (S/Z, tildes, orden de nombres)
+  const rows = useMemo(() => {
+    const rawQuery = query.trim();
+    if (!rawQuery) {
+      return (onlyDebt ? patients.filter((p) => debtIds.has(p.id)) : patients)
+        .slice()
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+    }
+
+    const cleanTokens = fold(rawQuery)
+      .replace(/[,.-]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const queryDigits = rawQuery.replace(/\D/g, "");
+
+    return patients
+      .filter((patient) => {
+        if (onlyDebt && !debtIds.has(patient.id)) return false;
+
+        // Búsqueda por DNI (si ingresó al menos 2 dígitos)
+        if (queryDigits.length >= 2 && patient.dni.includes(queryDigits)) return true;
+
+        // Búsqueda por Teléfono (si ingresó al menos 3 dígitos)
+        const patientDigits = patient.phone.replace(/\D/g, "");
+        if (queryDigits.length >= 3 && patientDigits.includes(queryDigits)) return true;
+
+        // Búsqueda por Nombre / Apellidos (independiente del orden y tolerante a S/Z)
+        if (cleanTokens.length > 0) {
+          const patientNormalized = fold(patient.fullName).replace(/[,.-]/g, " ");
+          const patientFoldedSZ = patientNormalized.replace(/z/g, "s");
+
+          const matchesAllTokens = cleanTokens.every((token) => {
+            if (patientNormalized.includes(token)) return true;
+            const tokenSZ = token.replace(/z/g, "s");
+            return patientFoldedSZ.includes(tokenSZ);
+          });
+
+          if (matchesAllTokens) return true;
+        }
+
+        return false;
+      })
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+  }, [patients, query, onlyDebt, debtIds]);
 
   const handleExport = () => {
     try {
