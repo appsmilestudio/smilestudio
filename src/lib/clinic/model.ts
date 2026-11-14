@@ -1,4 +1,4 @@
-export type TabId = "odontograma" | "ficha" | "citas" | "plan" | "ortodoncia";
+export type TabId = "ficha" | "odontograma" | "ortodoncia";
 
 export type Tool =
   | "sano"
@@ -79,29 +79,19 @@ export type Patient = {
 
 export const TABS: { id: TabId; label: string; blurb: string }[] = [
   {
-    id: "odontograma",
-    label: "Odontograma",
-    blurb: "Odontograma oficial dorado con simbología, anatomía y plan.",
-  },
-  {
     id: "ficha",
-    label: "Ficha clínica",
-    blurb: "Historia clínica, antecedentes y odontograma concéntrico.",
+    label: "Ficha Clínica (Horizontal)",
+    blurb: "Díptico oficial completo: Ficha, Próximas Citas, Plan de Tratamiento y Presupuesto/Evolución.",
   },
   {
-    id: "citas",
-    label: "Próximas citas",
-    blurb: "Tarjeta oficial de citas programadas del paciente.",
-  },
-  {
-    id: "plan",
-    label: "Plan y presupuesto",
-    blurb: "Plan de tratamiento, presupuesto y evolución con saldo.",
+    id: "odontograma",
+    label: "Odontograma Oficial",
+    blurb: "Odontograma oficial dorado vertical con simbología y anatomía.",
   },
   {
     id: "ortodoncia",
-    label: "Control de ortodoncia",
-    blurb: "Instalación, controles mensuales y cuota.",
+    label: "Control de Ortodoncia",
+    blurb: "Hoja de control de ortodoncia, instalación y cuota mensual.",
   },
 ];
 

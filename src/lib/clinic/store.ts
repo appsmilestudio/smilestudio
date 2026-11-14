@@ -69,7 +69,7 @@ export const useClinic = create<ClinicState>()(
   persist(
     (set, get) => ({
       hydrated: false,
-      tab: "odontograma",
+      tab: "ficha",
       tool: "caries",
       activeId: null,
       lastOdontologo: "",

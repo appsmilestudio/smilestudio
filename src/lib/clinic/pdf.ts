@@ -22,9 +22,10 @@ async function waitForImagesAndFonts(root: HTMLElement) {
 }
 
 /**
- * Guarda las hojas en formato PDF de alta resolución.
- * Cada elemento con [data-pdf-page] se calibra exactamente para ocupar 1 página A4 completa (210 x 297 mm)
- * sin cortes raros ni tablas partidas a la mitad.
+ * Guarda las hojas en formato PDF de alta resolución (300 DPI).
+ * Detecta automáticamente si la hoja es de orientación horizontal (Landscape: 297 x 210 mm)
+ * o vertical (Portrait: 210 x 297 mm) para que el díptico y las fichas calcen al milímetro
+ * sin cortes ni tablas partidas.
  */
 export async function saveSheetsPdf(
   pages: HTMLElement[],
@@ -32,22 +33,30 @@ export async function saveSheetsPdf(
 ) {
   if (!pages.length) throw new Error("No hay hojas para generar el PDF.");
 
-  // Esperar carga de imágenes y tipografías
+  // Esperar carga completa de imágenes y fuentes tipográficas
   for (const page of pages) {
     await waitForImagesAndFonts(page);
   }
 
+  // Detectar orientación de la primera página
+  const firstIsLandscape =
+    pages[0]?.getAttribute("data-orientation") === "landscape" ||
+    (pages[0] && pages[0].scrollWidth > pages[0].scrollHeight);
+
   const pdf = new jsPDF({
     unit: "mm",
     format: "a4",
-    orientation: "portrait",
+    orientation: firstIsLandscape ? "landscape" : "portrait",
     compress: true,
   });
 
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
+    const isLandscape =
+      page.getAttribute("data-orientation") === "landscape" ||
+      page.scrollWidth > page.scrollHeight;
 
-    // Capturar a escala 2.5 para calidad de impresión 300 DPI nítida
+    // Captura a escala 2.5 para calidad de imprenta 300 DPI
     const dataUrl = await domToPng(page, {
       scale: 2.5,
       backgroundColor: "#ffffff",
@@ -55,11 +64,16 @@ export async function saveSheetsPdf(
     });
 
     if (i > 0) {
-      pdf.addPage("a4", "portrait");
+      pdf.addPage("a4", isLandscape ? "landscape" : "portrait");
     }
 
-    // Insertar exactamente en la página A4 (210mm x 297mm)
-    pdf.addImage(dataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+    if (isLandscape) {
+      // Página A4 horizontal: 297 x 210 mm
+      pdf.addImage(dataUrl, "JPEG", 0, 0, 297, 210, undefined, "FAST");
+    } else {
+      // Página A4 vertical: 210 x 297 mm
+      pdf.addImage(dataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+    }
   }
 
   pdf.save(filename);

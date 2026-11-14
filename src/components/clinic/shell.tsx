@@ -5,11 +5,9 @@ import { patientLabel, TABS, type Patient, type SurfaceId, type TabId, type Tool
 import { useClinic } from "@/lib/clinic/store";
 import { startFichasSync } from "@/lib/smile/cloud";
 import { FichaSheet } from "./ficha";
-import { CitasSheet } from "./citas";
 import { MarkImg, StudioLogo } from "./mark";
 import { OdontogramaSheet } from "./odontograma";
 import { OrtodonciaSheet } from "./ortodoncia";
-import { PlanSheet } from "./plan";
 import "./clinic.css";
 
 export function ClinicApp() {
@@ -50,7 +48,6 @@ function Desk() {
   const edit = useClinic((s) => s.edit);
   const applyTooth = useClinic((s) => s.applyTooth);
   const applyArch = useClinic((s) => s.applyArch);
-  const copyArch = useClinic((s) => s.copyArch);
 
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -86,7 +83,7 @@ function Desk() {
       .replace(/[^a-zA-Z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
-    setNotice("Generando PDF de la hoja actual en alta calidad (300 DPI)…");
+    setNotice("Generando PDF de alta calidad (300 DPI)…");
     flushSync(() => setExporting("current"));
 
     try {
@@ -96,7 +93,8 @@ function Desk() {
       if (!pages.length) pages.push(root);
 
       const { saveSheetsPdf } = await import("@/lib/clinic/pdf");
-      await saveSheetsPdf(pages, `Smile-Studio-${tab}-${safe || "paciente"}.pdf`);
+      const isHorizontal = tab === "ficha";
+      await saveSheetsPdf(pages, `Smile-Studio-${isHorizontal ? "Ficha-Horizontal" : tab}-${safe || "paciente"}.pdf`);
       setNotice("¡PDF descargado con éxito!");
     } catch {
       setNotice("No se pudo generar el PDF.");
@@ -107,7 +105,7 @@ function Desk() {
 
   const downloadAll = async () => {
     if (!active || exporting) {
-      if (!active) setNotice("Selecciona un paciente para exportar la ficha completa.");
+      if (!active) setNotice("Selecciona un paciente para exportar el expediente completo.");
       return;
     }
     const safe = patientLabel(active)
@@ -116,7 +114,7 @@ function Desk() {
       .replace(/[^a-zA-Z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
-    setNotice("Generando expediente clínico completo (todas las hojas en A4)…");
+    setNotice("Generando expediente clínico completo…");
     flushSync(() => setExporting("all"));
 
     try {
@@ -126,7 +124,7 @@ function Desk() {
       if (!pages.length) throw new Error("No se encontraron hojas.");
 
       const { saveSheetsPdf } = await import("@/lib/clinic/pdf");
-      await saveSheetsPdf(pages, `Smile-Studio-Completo-${safe || "paciente"}.pdf`);
+      await saveSheetsPdf(pages, `Smile-Studio-Expediente-${safe || "paciente"}.pdf`);
       setNotice("¡Expediente PDF completo descargado!");
     } catch {
       setNotice("No se pudo generar el PDF completo.");
@@ -254,7 +252,7 @@ function Desk() {
               className="btn-line"
               onClick={() => window.print()}
               disabled={!active}
-              title="Imprimir hoja actual en tamaño A4"
+              title="Imprimir documento actual"
             >
               <Printer className="h-4 w-4" />
               Imprimir
@@ -264,20 +262,20 @@ function Desk() {
               className="btn-line"
               onClick={() => void downloadCurrent()}
               disabled={!active || exporting !== null}
-              title="Descargar esta hoja en PDF"
+              title="Descargar este documento en PDF (formato horizontal o vertical según corresponda)"
             >
               <Download className="h-4 w-4" />
-              {exporting === "current" ? "Generando…" : "PDF (Hoja)"}
+              {exporting === "current" ? "Generando…" : tab === "ficha" ? "PDF (Horizontal)" : "PDF (Hoja)"}
             </button>
             <button
               type="button"
               className="btn-gold"
               onClick={() => void downloadAll()}
               disabled={!active || exporting !== null}
-              title="Descargar todas las hojas del paciente en un solo archivo PDF"
+              title="Descargar expediente completo en PDF"
             >
               <FileText className="h-4 w-4" />
-              {exporting === "all" ? "Generando expediente…" : "PDF (Completo)"}
+              {exporting === "all" ? "Generando expediente…" : "PDF (Expediente)"}
             </button>
           </div>
         </div>
@@ -303,7 +301,6 @@ function Desk() {
                 onEdit={onEdit}
                 onTooth={(fdi, target) => applyTooth(active.id, fdi, tool, target)}
                 onArch={(key) => applyArch(active.id, key, tool)}
-                onCopy={() => copyArch(active.id)}
               />
             </div>
           ) : (
@@ -312,7 +309,7 @@ function Desk() {
         </div>
       </div>
 
-      {/* Contenedor de renderizado oculto para exportar todas las hojas a PDF cuando se solicita */}
+      {/* Contenedor de renderizado oculto para exportar todas las hojas a PDF */}
       {exporting === "all" && active ? (
         <div
           ref={allSheetsRef}
@@ -321,7 +318,7 @@ function Desk() {
             position: "absolute",
             top: 0,
             left: "-9999px",
-            width: "794px",
+            width: "1123px",
             background: "#ffffff",
             zIndex: -1,
           }}
@@ -336,7 +333,6 @@ function Desk() {
                 onEdit={onEdit}
                 onTooth={(fdi, target) => applyTooth(active.id, fdi, tool, target)}
                 onArch={(key) => applyArch(active.id, key, tool)}
-                onCopy={() => copyArch(active.id)}
               />
             </div>
           ))}
@@ -354,7 +350,6 @@ function Sheet({
   onEdit,
   onTooth,
   onArch,
-  onCopy,
 }: {
   tab: TabId;
   tool: Tool;
@@ -363,36 +358,29 @@ function Sheet({
   onEdit: (recipe: (patient: Patient) => Patient) => void;
   onTooth: (fdi: string, target: SurfaceId | "crown") => void;
   onArch: (key: string) => void;
-  onCopy: () => void;
 }) {
-  if (tab === "ficha") {
+  if (tab === "ortodoncia") {
+    return <OrtodonciaSheet patient={patient} onEdit={onEdit} />;
+  }
+  if (tab === "odontograma") {
     return (
-      <FichaSheet
+      <OdontogramaSheet
         patient={patient}
         tool={tool}
         onTool={onTool}
         onEdit={onEdit}
-        onArch={onArch}
-        onCopy={onCopy}
+        onTooth={onTooth}
       />
     );
   }
-  if (tab === "citas") {
-    return <CitasSheet patient={patient} onEdit={onEdit} />;
-  }
-  if (tab === "plan") {
-    return <PlanSheet patient={patient} onEdit={onEdit} />;
-  }
-  if (tab === "ortodoncia") {
-    return <OrtodonciaSheet patient={patient} onEdit={onEdit} />;
-  }
+  // Por defecto, la Ficha Clínica Horizontal completa (Díptico Tiro/Retiro)
   return (
-    <OdontogramaSheet
+    <FichaSheet
       patient={patient}
       tool={tool}
       onTool={onTool}
       onEdit={onEdit}
-      onTooth={onTooth}
+      onArch={onArch}
     />
   );
 }
@@ -403,7 +391,7 @@ function Welcome({ onStart }: { onStart: (tab: TabId) => void }) {
       <StudioLogo className="w-32 h-auto mx-auto mb-4" />
       <h1 className="font-display text-3xl font-bold text-ink">Fichas Clínicas Odontológicas</h1>
       <p className="mt-2 text-sm text-muted max-w-md mx-auto">
-        Formatos idénticos a las hojas impresas de Smile Studio: Odontograma Oficial, Ficha Clínica, Próximas Citas, Plan de Tratamiento y Control de Ortodoncia.
+        Formatos idénticos a las hojas impresas de Smile Studio: Ficha Clínica Díptico Horizontal, Odontograma Oficial y Control de Ortodoncia.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         {TABS.map((item) => (
@@ -413,7 +401,7 @@ function Welcome({ onStart }: { onStart: (tab: TabId) => void }) {
             className="rounded-full border border-line bg-paper px-4 py-2 text-xs font-semibold text-ink shadow-sm hover:border-gold hover:text-gold-deep transition-colors"
             onClick={() => onStart(item.id)}
           >
-            + Crear {item.label}
+            + Abrir {item.label}
           </button>
         ))}
       </div>

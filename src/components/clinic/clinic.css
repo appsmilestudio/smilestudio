@@ -1352,10 +1352,50 @@
   box-sizing: border-box;
 }
 
+/* Formato Horizontal (Díptico Tiro/Retiro A4 Landscape) */
+.clinic-desk .landscape-sheet-page {
+  width: 100%;
+  max-width: 1123px;
+  min-height: 780px;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #2a241c;
+  padding: 18px 24px;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.clinic-desk .landscape-spread {
+  display: flex;
+  gap: 1.5rem;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+}
+
+.clinic-desk .spread-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.clinic-desk .spread-fold {
+  width: 1px;
+  border-left: 1px dashed rgba(59, 89, 152, 0.25);
+  margin: 0 0.2rem;
+  flex: none;
+  align-self: stretch;
+}
+
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 6mm;
+    size: auto;
+    margin: 5mm;
   }
   body, html {
     margin: 0 !important;
@@ -1392,6 +1432,19 @@
     max-height: 297mm !important;
     margin: 0 !important;
     padding: 10mm 12mm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    box-sizing: border-box !important;
+  }
+  .clinic-desk .landscape-sheet-page {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 195mm !important;
+    max-height: 210mm !important;
+    margin: 0 !important;
+    padding: 6mm 10mm !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     page-break-after: always !important;
