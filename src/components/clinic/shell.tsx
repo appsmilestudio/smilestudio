@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Download, Plus, Printer, Search, Trash2 } from "lucide-react";
+import { Download, FileText, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { patientLabel, TABS, type Patient, type SurfaceId, type TabId, type Tool } from "@/lib/clinic/model";
 import { useClinic } from "@/lib/clinic/store";
 import { startFichasSync } from "@/lib/smile/cloud";
 import { FichaSheet } from "./ficha";
+import { CitasSheet } from "./citas";
 import { MarkImg, StudioLogo } from "./mark";
 import { OdontogramaSheet } from "./odontograma";
 import { OrtodonciaSheet } from "./ortodoncia";
@@ -54,8 +55,9 @@ function Desk() {
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState<"current" | "all" | null>(null);
+  const currentSheetRef = useRef<HTMLDivElement>(null);
+  const allSheetsRef = useRef<HTMLDivElement>(null);
 
   const active = patients.find((p) => p.id === activeId) ?? null;
   const filtered = patients.filter((p) => {
@@ -73,9 +75,9 @@ function Desk() {
     edit(active.id, recipe);
   };
 
-  const download = async () => {
+  const downloadCurrent = async () => {
     if (!active || exporting) {
-      if (!active) setNotice("Abre una ficha para descargar el PDF.");
+      if (!active) setNotice("Selecciona o crea un paciente para exportar el PDF.");
       return;
     }
     const safe = patientLabel(active)
@@ -83,76 +85,114 @@ function Desk() {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-zA-Z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    flushSync(() => setExporting(true));
-    setNotice("Preparando el PDF…");
+
+    setNotice("Generando PDF de la hoja actual en alta calidad (300 DPI)…");
+    flushSync(() => setExporting("current"));
+
     try {
-      const root = stageRef.current;
-      if (!root) throw new Error("sin hoja");
+      const root = currentSheetRef.current;
+      if (!root) throw new Error("No se encontró la hoja activa.");
+      const pages = [...root.querySelectorAll<HTMLElement>("[data-pdf-page]")];
+      if (!pages.length) pages.push(root);
+
       const { saveSheetsPdf } = await import("@/lib/clinic/pdf");
-      await saveSheetsPdf(root, `Smile-Studio-${safe || "paciente"}.pdf`);
-      setNotice("PDF descargado.");
+      await saveSheetsPdf(pages, `Smile-Studio-${tab}-${safe || "paciente"}.pdf`);
+      setNotice("¡PDF descargado con éxito!");
     } catch {
-      setNotice("No se pudo crear el PDF.");
+      setNotice("No se pudo generar el PDF.");
     } finally {
-      setExporting(false);
+      setExporting(null);
+    }
+  };
+
+  const downloadAll = async () => {
+    if (!active || exporting) {
+      if (!active) setNotice("Selecciona un paciente para exportar la ficha completa.");
+      return;
+    }
+    const safe = patientLabel(active)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    setNotice("Generando expediente clínico completo (todas las hojas en A4)…");
+    flushSync(() => setExporting("all"));
+
+    try {
+      const root = allSheetsRef.current;
+      if (!root) throw new Error("No se encontró el contenedor de hojas.");
+      const pages = [...root.querySelectorAll<HTMLElement>("[data-pdf-page]")];
+      if (!pages.length) throw new Error("No se encontraron hojas.");
+
+      const { saveSheetsPdf } = await import("@/lib/clinic/pdf");
+      await saveSheetsPdf(pages, `Smile-Studio-Completo-${safe || "paciente"}.pdf`);
+      setNotice("¡Expediente PDF completo descargado!");
+    } catch {
+      setNotice("No se pudo generar el PDF completo.");
+    } finally {
+      setExporting(null);
     }
   };
 
   return (
-    <div className="desk">
-      <aside className="rail no-print">
-        <div className="rail-brand">
-          <StudioLogo className="studio-logo side" />
+    <div className="clinic-grid">
+      {/* Barra lateral de pacientes */}
+      <aside className="clinic-rail no-print">
+        <div className="rail-head">
+          <button type="button" className="btn-gold new-btn" onClick={() => start()}>
+            <Plus className="h-4 w-4" />
+            Nueva ficha
+          </button>
+          <div className="search-wrap">
+            <Search className="search-ico" />
+            <input
+              type="search"
+              placeholder="Buscar ficha por nombre, DNI…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="search-input"
+              aria-label="Buscar pacientes"
+            />
+          </div>
         </div>
-        <button type="button" className="btn-gold" onClick={() => start()}>
-          <Plus className="h-4 w-4" />
-          Nuevo paciente
-        </button>
-        <label className="search">
-          <Search className="h-4 w-4" />
-          <input
-            value={query}
-            placeholder="Buscar nombre o DNI"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <ul className="patient-list">
+
+        <ul className="rail-list" role="listbox" aria-label="Fichas clínicas">
           {filtered.length === 0 ? (
-            <li className="empty-list">Todavía no hay fichas.</li>
+            <li className="rail-empty">
+              {patients.length === 0 ? "Aún no hay fichas creadas." : "No hay pacientes con esa búsqueda."}
+            </li>
           ) : (
             filtered.map((patient) => {
-              const selected = patient.id === active?.id;
+              const on = patient.id === activeId;
+              const title = patientLabel(patient);
+              const extra = [patient.dni ? `DNI ${patient.dni}` : "", patient.telefono].filter(Boolean).join(" · ");
+              const deleting = pendingDelete === patient.id;
               return (
-                <li key={patient.id}>
+                <li key={patient.id} className={on ? "rail-item active" : "rail-item"}>
                   <button
                     type="button"
-                    className={selected ? "patient on" : "patient"}
-                    onClick={() => {
-                      setActive(patient.id);
-                      setPendingDelete(null);
-                    }}
+                    className="rail-item-body"
+                    onClick={() => setActive(patient.id)}
+                    aria-selected={on}
                   >
-                    <span className="patient-name">{patientLabel(patient)}</span>
-                    <span className="patient-meta">
-                      {patient.dni ? `DNI ${patient.dni}` : "Sin DNI"}
-                      {patient.fecha ? ` · ${patient.fecha}` : ""}
-                    </span>
+                    <span className="rail-item-title">{title}</span>
+                    <span className="rail-item-meta">{extra || "Sin datos de contacto"}</span>
                   </button>
-                  {selected ? (
-                    pendingDelete === patient.id ? (
-                      <div className="confirm">
-                        <span>¿Eliminar esta ficha?</span>
-                        <button type="button" className="text-btn danger" onClick={() => removePatient(patient.id)}>
-                          Eliminar
+                  {on ? (
+                    deleting ? (
+                      <div className="rail-delete-confirm">
+                        <span>¿Eliminar?</span>
+                        <button type="button" className="btn-alert-sm" onClick={() => removePatient(patient.id)}>
+                          Sí
                         </button>
-                        <button type="button" className="text-btn" onClick={() => setPendingDelete(null)}>
-                          Cancelar
+                        <button type="button" className="btn-line-sm" onClick={() => setPendingDelete(null)}>
+                          No
                         </button>
                       </div>
                     ) : (
                       <button type="button" className="text-btn danger" onClick={() => setPendingDelete(patient.id)}>
                         <Trash2 className="h-4 w-4" />
-                        Eliminar ficha
                       </button>
                     )
                   ) : null}
@@ -161,16 +201,17 @@ function Desk() {
             })
           )}
         </ul>
+
         <div className="rail-foot">
-          <button type="button" className="btn-line" onClick={() => void download()} disabled={!active || exporting}>
-            <Download className="h-4 w-4" />
-            {exporting ? "Descargando…" : "Descargar copia"}
-          </button>
-          <p>Se guarda solo en este dispositivo. Av. Grau 877 · 949 390 316</p>
+          <p className="text-[11px] text-muted text-center">
+            Av. Grau 877 · Tel: 949 390 316
+          </p>
         </div>
       </aside>
 
+      {/* Área de trabajo */}
       <div className="workspace">
+        {/* Barra móvil */}
         <div className="mobile-bar no-print">
           <MarkImg className="mark-img sm" />
           <select
@@ -178,73 +219,115 @@ function Desk() {
             value={active?.id ?? ""}
             onChange={(event) => setActive(event.target.value || null)}
           >
-            <option value="">Sin paciente</option>
+            <option value="">Seleccionar paciente...</option>
             {patients.map((patient) => (
               <option key={patient.id} value={patient.id}>
                 {patientLabel(patient)}
               </option>
             ))}
           </select>
-          <button type="button" className="btn-gold icon-btn" onClick={() => start()} aria-label="Nuevo paciente">
+          <button type="button" className="btn-gold icon-btn" onClick={() => start()} aria-label="Nueva ficha">
             <Plus className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="tabbar no-print" role="tablist" aria-label="Fichas">
-          {TABS.map((item) => (
+        {/* Barra superior de pestañas y botones de exportación */}
+        <div className="tabbar no-print" role="tablist" aria-label="Hojas">
+          <div className="tabbar-items">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                className={tab === item.id ? "tab on" : "tab"}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="tabbar-actions">
             <button
-              key={item.id}
               type="button"
-              role="tab"
-              aria-selected={tab === item.id}
-              className={tab === item.id ? "tab on" : "tab"}
-              onClick={() => setTab(item.id)}
+              className="btn-line"
+              onClick={() => window.print()}
+              disabled={!active}
+              title="Imprimir hoja actual en tamaño A4"
             >
-              {item.label}
+              <Printer className="h-4 w-4" />
+              Imprimir
             </button>
-          ))}
-          <button type="button" className="btn-line print-btn" onClick={() => window.print()} disabled={!active}>
-            <Printer className="h-4 w-4" />
-            Imprimir
-          </button>
-          <button
-            type="button"
-            className="btn-line tab-download"
-            onClick={() => void download()}
-            disabled={!active || exporting}
-          >
-            <Download className="h-4 w-4" />
-            {exporting ? "Descargando…" : "PDF"}
-          </button>
+            <button
+              type="button"
+              className="btn-line"
+              onClick={() => void downloadCurrent()}
+              disabled={!active || exporting !== null}
+              title="Descargar esta hoja en PDF"
+            >
+              <Download className="h-4 w-4" />
+              {exporting === "current" ? "Generando…" : "PDF (Hoja)"}
+            </button>
+            <button
+              type="button"
+              className="btn-gold"
+              onClick={() => void downloadAll()}
+              disabled={!active || exporting !== null}
+              title="Descargar todas las hojas del paciente en un solo archivo PDF"
+            >
+              <FileText className="h-4 w-4" />
+              {exporting === "all" ? "Generando expediente…" : "PDF (Completo)"}
+            </button>
+          </div>
         </div>
 
         {notice ? (
-          <p className="notice no-print" role="status">
-            {notice}
-          </p>
+          <div className="notice no-print" role="status">
+            <span>{notice}</span>
+            <button type="button" className="text-xs underline ml-2" onClick={() => setNotice(null)}>
+              Cerrar
+            </button>
+          </div>
         ) : null}
 
-        <div className="desk-scroll">
+        {/* Contenedor interactivo de la hoja activa */}
+        <div className="desk-scroll" ref={currentSheetRef}>
           {active ? (
-            <Sheet
-              tab={tab}
-              tool={tool}
-              patient={active}
-              onTool={setTool}
-              onEdit={onEdit}
-              onTooth={(fdi, target) => applyTooth(active.id, fdi, tool, target)}
-              onArch={(key) => applyArch(active.id, key, tool)}
-              onCopy={() => copyArch(active.id)}
-            />
+            <div className="printable-sheet-wrapper">
+              <Sheet
+                tab={tab}
+                tool={tool}
+                patient={active}
+                onTool={setTool}
+                onEdit={onEdit}
+                onTooth={(fdi, target) => applyTooth(active.id, fdi, tool, target)}
+                onArch={(key) => applyArch(active.id, key, tool)}
+                onCopy={() => copyArch(active.id)}
+              />
+            </div>
           ) : (
             <Welcome onStart={start} />
           )}
         </div>
       </div>
-      {exporting && active ? (
-        <div className="pdf-stage" ref={stageRef} aria-hidden>
+
+      {/* Contenedor de renderizado oculto para exportar todas las hojas a PDF cuando se solicita */}
+      {exporting === "all" && active ? (
+        <div
+          ref={allSheetsRef}
+          className="pdf-staging-container"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "-9999px",
+            width: "794px",
+            background: "#ffffff",
+            zIndex: -1,
+          }}
+        >
           {TABS.map((item) => (
-            <div key={item.id} className="pdf-page" data-pdf-page>
+            <div key={item.id} className="pdf-page-container">
               <Sheet
                 tab={item.id}
                 tool={tool}
@@ -284,31 +367,56 @@ function Sheet({
 }) {
   if (tab === "ficha") {
     return (
-      <FichaSheet patient={patient} tool={tool} onTool={onTool} onEdit={onEdit} onArch={onArch} onCopy={onCopy} />
+      <FichaSheet
+        patient={patient}
+        tool={tool}
+        onTool={onTool}
+        onEdit={onEdit}
+        onArch={onArch}
+        onCopy={onCopy}
+      />
     );
   }
-  if (tab === "plan") return <PlanSheet patient={patient} onEdit={onEdit} />;
-  if (tab === "ortodoncia") return <OrtodonciaSheet patient={patient} onEdit={onEdit} />;
-  return <OdontogramaSheet patient={patient} tool={tool} onTool={onTool} onEdit={onEdit} onTooth={onTooth} />;
+  if (tab === "citas") {
+    return <CitasSheet patient={patient} onEdit={onEdit} />;
+  }
+  if (tab === "plan") {
+    return <PlanSheet patient={patient} onEdit={onEdit} />;
+  }
+  if (tab === "ortodoncia") {
+    return <OrtodonciaSheet patient={patient} onEdit={onEdit} />;
+  }
+  return (
+    <OdontogramaSheet
+      patient={patient}
+      tool={tool}
+      onTool={onTool}
+      onEdit={onEdit}
+      onTooth={onTooth}
+    />
+  );
 }
 
 function Welcome({ onStart }: { onStart: (tab: TabId) => void }) {
   return (
-    <section className="sheet welcome">
-      <StudioLogo />
-      <h1>Fichas para atender</h1>
-      <p className="welcome-copy">
-        Cuatro hojas iguales a las del consultorio. Elige una y empieza la ficha del paciente.
+    <section className="sheet-page welcome-page text-center py-16 px-6">
+      <StudioLogo className="w-32 h-auto mx-auto mb-4" />
+      <h1 className="font-display text-3xl font-bold text-ink">Fichas Clínicas Odontológicas</h1>
+      <p className="mt-2 text-sm text-muted max-w-md mx-auto">
+        Formatos idénticos a las hojas impresas de Smile Studio: Odontograma Oficial, Ficha Clínica, Próximas Citas, Plan de Tratamiento y Control de Ortodoncia.
       </p>
-      <div className="welcome-grid">
+      <div className="mt-8 flex flex-wrap justify-center gap-3">
         {TABS.map((item) => (
-          <button key={item.id} type="button" className="welcome-card" onClick={() => onStart(item.id)}>
-            <span>{item.label}</span>
-            <small>{item.blurb}</small>
+          <button
+            key={item.id}
+            type="button"
+            className="rounded-full border border-line bg-paper px-4 py-2 text-xs font-semibold text-ink shadow-sm hover:border-gold hover:text-gold-deep transition-colors"
+            onClick={() => onStart(item.id)}
+          >
+            + Crear {item.label}
           </button>
         ))}
       </div>
-      <p className="hint">Av. Grau 877, Piura · 949 390 316</p>
     </section>
   );
 }

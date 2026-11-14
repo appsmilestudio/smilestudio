@@ -13,8 +13,7 @@ import {
   type Tool,
   type ToothChart,
 } from "@/lib/clinic/model";
-import { Diamond, GoldFooter, LegendList, MarkImg, StudioLogo } from "./mark";
-import { PaperLine, RuledArea } from "./fields";
+import { Diamond, GoldFooter, LegendList, StudioLogo } from "./mark";
 
 export function OdontogramaSheet({
   patient,
@@ -32,124 +31,161 @@ export function OdontogramaSheet({
   const toolLabel = LEGEND.find((item) => item.id === tool)?.label ?? "Sano";
 
   return (
-    <article className="sheet">
-      <div className="odonto-layout">
-        <aside className="odonto-side">
-          <div className="brand-lockup">
-            <StudioLogo />
+    <article className="sheet-page odonto-page" data-pdf-page>
+      <div className="odonto-page-body">
+        {/* Columna Izquierda: Logo Dorado, Simbología, Frase */}
+        <aside className="odonto-sidebar">
+          <div className="odonto-logo-wrap">
+            <StudioLogo className="w-40 h-auto object-contain mx-auto" />
           </div>
-          <LegendList tool={tool} onTool={onTool} />
-          <p className="no-print hint">
-            Elige un símbolo. En caries, obturación o sellante toca una cara; en el resto, toca la
-            corona. Sano borra.
+
+          <div className="mt-4">
+            <LegendList tool={tool} onTool={onTool} />
+          </div>
+
+          <p className="no-print mt-2 text-[11px] text-muted leading-tight">
+            Marcando: <strong className="text-gold-deep">{toolLabel}</strong>. Toca una cara (oclusal, vestibular, lingual, mesial, distal) o la corona.
           </p>
-          <figure className="mouth-quote">
-            <MarkImg className="mark-img sm" />
-            <blockquote>
-              Una boca sana es el reflejo de una <em>vida saludable.</em>
+
+          <figure className="mouth-quote mt-6 text-center">
+            <div className="mx-auto mb-1 flex justify-center text-gold">
+              <svg viewBox="0 0 24 24" className="w-8 h-8 fill-none stroke-current" strokeWidth="1.5">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            </div>
+            <blockquote className="text-[11px] italic text-[#6b4c10] leading-snug">
+              Una boca sana es el reflejo de una <strong className="font-semibold">vida saludable. ♡</strong>
             </blockquote>
           </figure>
         </aside>
-        <div className="odonto-main">
-          <div className="identity-grid">
-            <PaperLine
-              id="field-paciente"
-              label="Paciente:"
-              value={patient.nombreCompleto}
-              placeholder={`${patient.apellidos} ${patient.nombres}`.trim()}
-              onChange={(nombreCompleto) => onEdit((p) => ({ ...p, nombreCompleto }))}
-            />
-            <div className="split-2">
-              <PaperLine
-                label="Edad:"
-                value={patient.edad}
-                inputMode="numeric"
-                onChange={(edad) => onEdit((p) => ({ ...p, edad }))}
-              />
-              <PaperLine
-                label="DNI:"
-                value={patient.dni}
-                inputMode="numeric"
-                onChange={(dni) => onEdit((p) => ({ ...p, dni }))}
+
+        {/* Columna Derecha: Datos del Paciente, Título Dorado, Arco Superior e Inferior, Notas */}
+        <main className="odonto-content">
+          {/* Cuadro de datos superior */}
+          <div className="border border-gold/40 rounded-xl p-3 bg-cream/30 text-xs space-y-1.5">
+            <div className="flex items-end gap-2 border-b border-gold/30 pb-0.5">
+              <span className="font-bold text-[#6b4c10] uppercase tracking-wide min-w-20">PACIENTE:</span>
+              <input
+                className="flex-1 bg-transparent px-1 font-medium text-ink outline-none"
+                value={patient.nombreCompleto}
+                placeholder={`${patient.apellidos} ${patient.nombres}`.trim()}
+                onChange={(e) => onEdit((p) => ({ ...p, nombreCompleto: e.target.value }))}
               />
             </div>
-            <PaperLine
-              label="Odontólogo(a):"
-              value={patient.odontologo}
-              onChange={(odontologo) => onEdit((p) => ({ ...p, odontologo }))}
-            />
-            <div className="split-2">
-              <PaperLine
-                label="Fecha:"
-                value={patient.fecha}
-                placeholder="dd/mm/aaaa"
-                onChange={(fecha) => onEdit((p) => ({ ...p, fecha }))}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-end gap-2 border-b border-gold/30 pb-0.5">
+                <span className="font-bold text-[#6b4c10] uppercase tracking-wide min-w-12">EDAD:</span>
+                <input
+                  className="flex-1 bg-transparent px-1 font-medium text-ink outline-none"
+                  value={patient.edad}
+                  onChange={(e) => onEdit((p) => ({ ...p, edad: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-end gap-2 border-b border-gold/30 pb-0.5">
+                <span className="font-bold text-[#6b4c10] uppercase tracking-wide min-w-10">DNI:</span>
+                <input
+                  className="flex-1 bg-transparent px-1 font-medium text-ink outline-none"
+                  value={patient.dni}
+                  onChange={(e) => onEdit((p) => ({ ...p, dni: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex items-end gap-2 border-b border-gold/30 pb-0.5">
+              <span className="font-bold text-[#6b4c10] uppercase tracking-wide min-w-28">ODONTÓLOGO(A):</span>
+              <input
+                className="flex-1 bg-transparent px-1 font-medium text-ink outline-none"
+                value={patient.odontologo}
+                onChange={(e) => onEdit((p) => ({ ...p, odontologo: e.target.value }))}
               />
-              <PaperLine
-                label="Teléfono:"
-                value={patient.telefono}
-                inputMode="tel"
-                onChange={(telefono) => onEdit((p) => ({ ...p, telefono }))}
-              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-end gap-2 border-b border-gold/30 pb-0.5">
+                <span className="font-bold text-[#6b4c10] uppercase tracking-wide min-w-14">FECHA:</span>
+                <input
+                  className="flex-1 bg-transparent px-1 font-medium text-ink outline-none"
+                  value={patient.fecha}
+                  placeholder="dd/mm/aaaa"
+                  onChange={(e) => onEdit((p) => ({ ...p, fecha: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-end gap-2 border-b border-gold/30 pb-0.5">
+                <span className="font-bold text-[#6b4c10] uppercase tracking-wide min-w-20">TELÉFONO:</span>
+                <input
+                  className="flex-1 bg-transparent px-1 font-medium text-ink outline-none"
+                  value={patient.telefono}
+                  onChange={(e) => onEdit((p) => ({ ...p, telefono: e.target.value }))}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="chart-title">
+          {/* Título Central */}
+          <div className="my-3 flex items-center justify-center gap-2">
             <Diamond />
-            <h2>Odontograma</h2>
+            <h2 className="font-display text-lg font-bold tracking-widest text-[#6b4c10] uppercase">
+              ODONTOGRAMA
+            </h2>
             <Diamond />
           </div>
-          <p className="no-print marking">Marcando: {toolLabel}</p>
 
+          {/* Arcos Dentales con anatomía y caras */}
           <ArchBlock
-            title="Superior"
+            title="SUPERIOR"
             ids={UPPER}
             numbers="top"
             patient={patient}
             onTooth={onTooth}
           />
           <ArchBlock
-            title="Inferior"
+            title="INFERIOR"
             ids={LOWER}
             numbers="bottom"
             patient={patient}
             onTooth={onTooth}
           />
 
-          <div className="notes-grid">
-            <RuledArea
-              label="Observaciones:"
-              value={patient.observacionesOdonto}
-              rows={5}
-              onChange={(observacionesOdonto) => onEdit((p) => ({ ...p, observacionesOdonto }))}
-            />
-            <div>
-              <p className="paper-label">Plan de tratamiento:</p>
-              <ol className="plan-lines">
+          {/* Notas y Plan de Tratamiento */}
+          <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
+            {/* Observaciones */}
+            <div className="space-y-1">
+              <p className="font-bold text-[#6b4c10] uppercase tracking-wide">OBSERVACIONES:</p>
+              <textarea
+                className="w-full h-24 bg-transparent border border-gold/30 rounded-lg p-2 text-xs text-ink resize-none outline-none focus:border-gold"
+                value={patient.observacionesOdonto}
+                onChange={(e) => onEdit((p) => ({ ...p, observacionesOdonto: e.target.value }))}
+              />
+            </div>
+            {/* Plan de Tratamiento (1 a 5) */}
+            <div className="space-y-1">
+              <p className="font-bold text-[#6b4c10] uppercase tracking-wide">PLAN DE TRATAMIENTO:</p>
+              <div className="space-y-1">
                 {patient.planOdonto.map((line, index) => (
-                  <li key={index}>
-                    <span>{index + 1}.</span>
+                  <div key={index} className="flex items-center gap-1.5 border-b border-gold/30 pb-0.5">
+                    <span className="font-bold text-[#6b4c10] text-xs">{index + 1}.</span>
                     <input
-                      className="paper-input"
+                      className="flex-1 bg-transparent px-1 text-xs text-ink outline-none"
                       value={line}
-                      aria-label={`Plan ${index + 1}`}
-                      onChange={(event) => {
-                        const value = event.target.value;
+                      onChange={(e) => {
+                        const val = e.target.value;
                         onEdit((p) => {
                           const planOdonto = [...p.planOdonto] as Patient["planOdonto"];
-                          planOdonto[index] = value;
+                          planOdonto[index] = val;
                           return { ...p, planOdonto };
                         });
                       }}
                     />
-                  </li>
+                  </div>
                 ))}
-              </ol>
+              </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
-      <GoldFooter />
+
+      {/* Footer dorado con teléfono, dirección y lema */}
+      <div className="mt-auto">
+        <GoldFooter />
+      </div>
     </article>
   );
 }
@@ -215,8 +251,11 @@ function ArchBlock({
     </div>
   );
   return (
-    <section className="arch-block">
-      <h3>{title}</h3>
+    <section className="arch-block my-2">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[11px] font-bold text-[#6b4c10] tracking-wider uppercase">{title}</span>
+        <div className="flex-1 h-px bg-gold/30" />
+      </div>
       <div className="teeth-scroll">
         <div className="teeth-stack">
           {upper ? <NumberRow ids={ids} /> : null}
@@ -235,7 +274,7 @@ function NumberRow({ ids }: { ids: string[] }) {
       {ids.slice(0, 8).map((id) => (
         <span key={id}>{id}</span>
       ))}
-      <span />
+      <span className="midline-space" />
       {ids.slice(8).map((id) => (
         <span key={id}>{id}</span>
       ))}
@@ -313,7 +352,7 @@ function Occlusal({
             }
           }}
         >
-          <title>{`Pieza ${fdi}, ${faceName(fdi, zone.id)}`}</title>
+          <title>{`Pieza ${fdi}`}</title>
         </polygon>
       ))}
       {tooth.whole === "extraccion" ? <path d="M6 6 L34 38 M34 6 L6 38" className="mark-line" /> : null}
@@ -362,12 +401,4 @@ function crownFill(tooth: ToothChart): string {
   const surface = Object.values(tooth.surfaces)[0];
   if (surface) return `color-mix(in srgb, ${markColor(surface)} 58%, white)`;
   return "var(--color-paper)";
-}
-
-function faceName(fdi: string, face: SurfaceId): string {
-  if (face === "v") return "vestibular";
-  if (face === "o") return "oclusal";
-  if (face === "m") return "mesial";
-  if (face === "d") return "distal";
-  return isUpper(fdi) ? "palatino" : "lingual";
 }

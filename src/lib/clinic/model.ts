@@ -1,4 +1,4 @@
-export type TabId = "odontograma" | "ficha" | "plan" | "ortodoncia";
+export type TabId = "odontograma" | "ficha" | "citas" | "plan" | "ortodoncia";
 
 export type Tool =
   | "sano"
@@ -81,22 +81,27 @@ export const TABS: { id: TabId; label: string; blurb: string }[] = [
   {
     id: "odontograma",
     label: "Odontograma",
-    blurb: "Piezas superiores e inferiores, simbología y plan corto.",
+    blurb: "Odontograma oficial dorado con simbología, anatomía y plan.",
   },
   {
     id: "ficha",
     label: "Ficha clínica",
-    blurb: "Datos, antecedentes, próximas citas y esquema.",
+    blurb: "Historia clínica, antecedentes y odontograma concéntrico.",
+  },
+  {
+    id: "citas",
+    label: "Próximas citas",
+    blurb: "Tarjeta oficial de citas programadas del paciente.",
   },
   {
     id: "plan",
-    label: "Plan de tratamiento",
-    blurb: "Presupuesto, evolución, pagos y saldo.",
+    label: "Plan y presupuesto",
+    blurb: "Plan de tratamiento, presupuesto y evolución con saldo.",
   },
   {
     id: "ortodoncia",
     label: "Control de ortodoncia",
-    blurb: "Instalación, controles y cuota mensual.",
+    blurb: "Instalación, controles mensuales y cuota.",
   },
 ];
 
@@ -233,15 +238,15 @@ export function blankPatient(id: string, odontologo = ""): Patient {
     medicamento: "",
     examen: "",
     observacionesHistoria: "",
-    citas: list(18, blankCita),
+    citas: list(15, blankCita),
     arch: {},
-    presupuesto: list(8, blankPresupuesto),
-    evolucion: list(10, blankEvolucion),
-    planRows: list(12, blankPlan),
+    presupuesto: list(9, blankPresupuesto),
+    evolucion: list(16, blankEvolucion),
+    planRows: list(22, blankPlan),
     cuotaMensual: "",
     fechaSup: "",
     fechaInf: "",
-    controles: list(14, blankControl),
+    controles: list(20, blankControl),
   };
 }
 

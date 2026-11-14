@@ -100,18 +100,21 @@ export function Cell({
   value,
   onChange,
   label,
+  placeholder,
   inputMode,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
-  inputMode?: "text" | "decimal" | "tel";
+  placeholder?: string;
+  inputMode?: "text" | "decimal" | "tel" | "numeric";
 }) {
   return (
     <input
       className="cell-input"
       value={value}
       aria-label={label}
+      placeholder={placeholder}
       inputMode={inputMode}
       onChange={(event) => onChange(event.target.value)}
     />

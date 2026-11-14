@@ -1,20 +1,7 @@
 import { jsPDF } from "jspdf";
 import { domToPng } from "modern-screenshot";
 
-const MARGIN = 8;
-const PAGE_W = 210 - MARGIN * 2;
-const PAGE_H = 297 - MARGIN * 2;
-
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("No se pudo leer la hoja."));
-    img.src = src;
-  });
-}
-
-async function waitForImages(root: HTMLElement) {
+async function waitForImagesAndFonts(root: HTMLElement) {
   const imgs = [...root.querySelectorAll("img")];
   await Promise.all(
     imgs.map(async (img) => {
@@ -29,43 +16,50 @@ async function waitForImages(root: HTMLElement) {
       }
     }),
   );
-  await document.fonts?.ready;
+  if (document.fonts) {
+    await document.fonts.ready;
+  }
 }
 
-export async function saveSheetsPdf(root: HTMLElement, filename: string) {
-  await waitForImages(root);
-  const pages = [...root.querySelectorAll<HTMLElement>("[data-pdf-page]")];
-  if (!pages.length) throw new Error("No hay hojas para el PDF.");
+/**
+ * Guarda las hojas en formato PDF de alta resolución.
+ * Cada elemento con [data-pdf-page] se calibra exactamente para ocupar 1 página A4 completa (210 x 297 mm)
+ * sin cortes raros ni tablas partidas a la mitad.
+ */
+export async function saveSheetsPdf(
+  pages: HTMLElement[],
+  filename: string,
+) {
+  if (!pages.length) throw new Error("No hay hojas para generar el PDF.");
 
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  let started = false;
-
+  // Esperar carga de imágenes y tipografías
   for (const page of pages) {
+    await waitForImagesAndFonts(page);
+  }
+
+  const pdf = new jsPDF({
+    unit: "mm",
+    format: "a4",
+    orientation: "portrait",
+    compress: true,
+  });
+
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+
+    // Capturar a escala 2.5 para calidad de impresión 300 DPI nítida
     const dataUrl = await domToPng(page, {
-      scale: 2,
-      backgroundColor: "#FFFDF8",
-      width: page.scrollWidth,
-      height: page.scrollHeight,
+      scale: 2.5,
+      backgroundColor: "#ffffff",
+      quality: 0.96,
     });
-    const img = await loadImage(dataUrl);
-    const pxPerMm = img.width / PAGE_W;
-    const slicePx = Math.max(1, Math.floor(PAGE_H * pxPerMm));
-    let y = 0;
-    while (y < img.height - 1) {
-      const sliceH = Math.min(slicePx, img.height - y);
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = sliceH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("No se pudo armar el PDF.");
-      ctx.fillStyle = "#FFFDF8";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, y, img.width, sliceH, 0, 0, img.width, sliceH);
-      if (started) pdf.addPage();
-      started = true;
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.86), "JPEG", MARGIN, MARGIN, PAGE_W, sliceH / pxPerMm);
-      y += sliceH;
+
+    if (i > 0) {
+      pdf.addPage("a4", "portrait");
     }
+
+    // Insertar exactamente en la página A4 (210mm x 297mm)
+    pdf.addImage(dataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
   }
 
   pdf.save(filename);

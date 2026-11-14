@@ -1,17 +1,5 @@
-import {
-  blankEvolucion,
-  blankPlan,
-  blankPresupuesto,
-  commitRow,
-  formatSoles,
-  isEvolucionEmpty,
-  isPlanEmpty,
-  isPresupuestoEmpty,
-  sumMoney,
-  type Patient,
-} from "@/lib/clinic/model";
-import { Cell, PaperLine } from "./fields";
-import { MarkImg } from "./mark";
+import { Cell } from "./fields";
+import type { Patient } from "@/lib/clinic/model";
 
 export function PlanSheet({
   patient,
@@ -20,233 +8,255 @@ export function PlanSheet({
   patient: Patient;
   onEdit: (recipe: (patient: Patient) => Patient) => void;
 }) {
-  const quoted = sumMoney(patient.presupuesto.map((row) => row.total));
-  const paid = sumMoney(patient.planRows.map((row) => row.pago));
-  const balance = quoted - paid;
-
   return (
-    <article className="sheet">
-      <header className="plan-mast">
-        <div className="plan-brand">
-          <MarkImg className="mark-img sm" />
-          <div>
-            <p className="eyebrow">Smile Studio</p>
-            <h2>Plan de tratamiento</h2>
+    <div className="space-y-6">
+      {/* 1. Hoja A4: Plan de Tratamiento (Foto 5 Izquierda) */}
+      <article className="sheet-page plan-page" data-pdf-page>
+        <header className="mb-4">
+          <div className="flex items-center justify-between border-b-2 border-[#1e3a6e] pb-2">
+            <h2 className="font-display text-xl font-bold tracking-wider text-[#1e3a6e] uppercase">
+              PLAN DE TRATAMIENTO
+            </h2>
+            <div className="text-right text-xs text-[#1e3a6e]">
+              <span className="font-semibold">{patient.nombreCompleto || `${patient.apellidos} ${patient.nombres}`.trim()}</span>
+              {patient.dni ? <span> · DNI: {patient.dni}</span> : null}
+            </div>
           </div>
-        </div>
-        <div className="split-3 plan-id">
-          <PaperLine
-            label="Paciente:"
-            value={patient.nombreCompleto}
-            onChange={(nombreCompleto) => onEdit((p) => ({ ...p, nombreCompleto }))}
-          />
-          <PaperLine
-            label="DNI:"
-            value={patient.dni}
-            inputMode="numeric"
-            onChange={(dni) => onEdit((p) => ({ ...p, dni }))}
-          />
-          <PaperLine
-            label="Fecha:"
-            value={patient.fecha}
-            onChange={(fecha) => onEdit((p) => ({ ...p, fecha }))}
-          />
-        </div>
-      </header>
+        </header>
 
-      <div className="plan-top">
-        <section>
-          <h3>Presupuesto</h3>
-          <div className="teeth-scroll">
-            <table className="grid-table">
-              <thead>
-                <tr>
-                  <th>Presupuesto</th>
-                  <th>Precio unit.</th>
-                  <th>Precio total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patient.presupuesto.map((row, index) => (
-                  <tr key={index}>
-                    <td>
-                      <Cell
-                        value={row.concepto}
-                        label={`Presupuesto ${index + 1}`}
-                        onChange={(concepto) =>
-                          onEdit((p) => ({
-                            ...p,
-                            presupuesto: commitRow(
-                              p.presupuesto,
-                              index,
-                              { ...row, concepto },
-                              isPresupuestoEmpty,
-                              blankPresupuesto(),
-                            ),
-                          }))
-                        }
-                      />
-                    </td>
-                    <td>
-                      <Cell
-                        value={row.unit}
-                        label={`Precio unitario ${index + 1}`}
-                        inputMode="decimal"
-                        onChange={(unit) =>
-                          onEdit((p) => ({
-                            ...p,
-                            presupuesto: commitRow(
-                              p.presupuesto,
-                              index,
-                              { ...row, unit },
-                              isPresupuestoEmpty,
-                              blankPresupuesto(),
-                            ),
-                          }))
-                        }
-                      />
-                    </td>
-                    <td>
-                      <Cell
-                        value={row.total}
-                        label={`Precio total ${index + 1}`}
-                        inputMode="decimal"
-                        onChange={(total) =>
-                          onEdit((p) => ({
-                            ...p,
-                            presupuesto: commitRow(
-                              p.presupuesto,
-                              index,
-                              { ...row, total },
-                              isPresupuestoEmpty,
-                              blankPresupuesto(),
-                            ),
-                          }))
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <section>
-          <h3>Evolución</h3>
-          <div className="teeth-scroll">
-            <table className="grid-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tratamiento</th>
-                  <th>Saldo</th>
-                  <th>Pago</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patient.evolucion.map((row, index) => (
-                  <tr key={index}>
-                    {(
-                      [
-                        ["fecha", "Fecha"],
-                        ["tratamiento", "Tratamiento"],
-                        ["saldo", "Saldo"],
-                        ["pago", "Pago"],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <td key={key}>
-                        <Cell
-                          value={row[key]}
-                          label={`${label} evolución ${index + 1}`}
-                          inputMode={key === "fecha" || key === "tratamiento" ? "text" : "decimal"}
-                          onChange={(value) =>
-                            onEdit((p) => ({
-                              ...p,
-                              evolucion: commitRow(
-                                p.evolucion,
-                                index,
-                                { ...row, [key]: value },
-                                isEvolucionEmpty,
-                                blankEvolucion(),
-                              ),
-                            }))
-                          }
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-
-      <section className="plan-bottom">
-        <h3>Plan de tratamiento</h3>
-        <div className="teeth-scroll">
-          <table className="grid-table">
+        <div className="plan-table-wrap">
+          <table className="w-full border-collapse border border-[#3b5998] text-xs">
             <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Tratamiento</th>
-                <th>Pago</th>
-                <th>Saldo</th>
+              <tr className="bg-[#1e3a6e]/5 text-[#1e3a6e]">
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[15%]">Fecha</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-left font-bold w-[55%]">Tratamiento</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[15%]">Pago</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[15%]">Saldo</th>
               </tr>
             </thead>
             <tbody>
-              {patient.planRows.map((row, index) => (
-                <tr key={index}>
-                  {(
-                    [
-                      ["fecha", "Fecha", "text"],
-                      ["tratamiento", "Tratamiento", "text"],
-                      ["pago", "Pago", "decimal"],
-                      ["saldo", "Saldo", "decimal"],
-                    ] as const
-                  ).map(([key, label, mode]) => (
-                    <td key={key}>
+              {Array.from({ length: 22 }, (_, idx) => {
+                const row = patient.planRows[idx] || { fecha: "", tratamiento: "", pago: "", saldo: "" };
+                return (
+                  <tr key={idx} className="h-7">
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
                       <Cell
-                        value={row[key]}
-                        label={`${label} plan ${index + 1}`}
-                        inputMode={mode}
-                        onChange={(value) =>
-                          onEdit((p) => ({
-                            ...p,
-                            planRows: commitRow(
-                              p.planRows,
-                              index,
-                              { ...row, [key]: value },
-                              isPlanEmpty,
-                              blankPlan(),
-                            ),
-                          }))
-                        }
+                        value={row.fecha}
+                        label={`Fecha plan ${idx + 1}`}
+                        onChange={(fecha) => {
+                          onEdit((p) => {
+                            const next = [...p.planRows];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", pago: "", saldo: "" });
+                            next[idx] = { ...next[idx], fecha };
+                            return { ...p, planRows: next };
+                          });
+                        }}
                       />
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    <td className="border border-[#3b5998]/60 p-0 text-left">
+                      <Cell
+                        value={row.tratamiento}
+                        label={`Tratamiento ${idx + 1}`}
+                        onChange={(tratamiento) => {
+                          onEdit((p) => {
+                            const next = [...p.planRows];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", pago: "", saldo: "" });
+                            next[idx] = { ...next[idx], tratamiento };
+                            return { ...p, planRows: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.pago}
+                        label={`Pago ${idx + 1}`}
+                        inputMode="decimal"
+                        onChange={(pago) => {
+                          onEdit((p) => {
+                            const next = [...p.planRows];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", pago: "", saldo: "" });
+                            next[idx] = { ...next[idx], pago };
+                            return { ...p, planRows: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.saldo}
+                        label={`Saldo ${idx + 1}`}
+                        inputMode="decimal"
+                        onChange={(saldo) => {
+                          onEdit((p) => {
+                            const next = [...p.planRows];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", pago: "", saldo: "" });
+                            next[idx] = { ...next[idx], saldo };
+                            return { ...p, planRows: next };
+                          });
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </section>
+      </article>
 
-      <dl className="money-strip no-print">
-        <div>
-          <dt>Presupuesto</dt>
-          <dd>{formatSoles(quoted)}</dd>
-        </div>
-        <div>
-          <dt>Cobrado</dt>
-          <dd>{formatSoles(paid)}</dd>
-        </div>
-        <div>
-          <dt>Saldo</dt>
-          <dd>{formatSoles(balance)}</dd>
-        </div>
-      </dl>
-      <p className="hint no-print">Los totales salen del precio total del presupuesto y de la columna Pago del plan. Escribe en soles, por ejemplo 150 o 150.50.</p>
-    </article>
+      {/* 2. Hoja A4: Presupuesto y Evolución (Foto 3 y Foto 5 Derecha) */}
+      <article className="sheet-page presupuesto-evolucion-page" data-pdf-page>
+        {/* Tabla Superior: Presupuesto (9 filas) */}
+        <section className="mb-6">
+          <table className="w-full border-collapse border border-[#3b5998] text-xs">
+            <thead>
+              <tr className="bg-[#1e3a6e]/5 text-[#1e3a6e]">
+                <th className="border border-[#3b5998] py-1.5 px-3 text-left font-bold w-[65%]">Presupuesto</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[17%]">Precio Unit.</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[18%]">Precio Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 9 }, (_, idx) => {
+                const row = patient.presupuesto[idx] || { concepto: "", unit: "", total: "" };
+                return (
+                  <tr key={idx} className="h-7">
+                    <td className="border border-[#3b5998]/60 p-0 text-left">
+                      <Cell
+                        value={row.concepto}
+                        label={`Presupuesto ${idx + 1}`}
+                        onChange={(concepto) => {
+                          onEdit((p) => {
+                            const next = [...p.presupuesto];
+                            while (next.length <= idx) next.push({ concepto: "", unit: "", total: "" });
+                            next[idx] = { ...next[idx], concepto };
+                            return { ...p, presupuesto: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.unit}
+                        label={`Precio unitario ${idx + 1}`}
+                        inputMode="decimal"
+                        onChange={(unit) => {
+                          onEdit((p) => {
+                            const next = [...p.presupuesto];
+                            while (next.length <= idx) next.push({ concepto: "", unit: "", total: "" });
+                            next[idx] = { ...next[idx], unit };
+                            return { ...p, presupuesto: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.total}
+                        label={`Precio total ${idx + 1}`}
+                        inputMode="decimal"
+                        onChange={(total) => {
+                          onEdit((p) => {
+                            const next = [...p.presupuesto];
+                            while (next.length <= idx) next.push({ concepto: "", unit: "", total: "" });
+                            next[idx] = { ...next[idx], total };
+                            return { ...p, presupuesto: next };
+                          });
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+
+        {/* Tabla Inferior: Evolución (16 filas) */}
+        <section>
+          <div className="mb-2">
+            <h3 className="font-bold text-sm text-[#1e3a6e]">Evolución:</h3>
+          </div>
+          <table className="w-full border-collapse border border-[#3b5998] text-xs">
+            <thead>
+              <tr className="bg-[#1e3a6e]/5 text-[#1e3a6e]">
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[15%]">Fecha</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-left font-bold w-[55%]">Tratamiento</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[15%]">Saldo</th>
+                <th className="border border-[#3b5998] py-1.5 px-2 text-center font-bold w-[15%]">Pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 16 }, (_, idx) => {
+                const row = patient.evolucion[idx] || { fecha: "", tratamiento: "", saldo: "", pago: "" };
+                return (
+                  <tr key={idx} className="h-7">
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.fecha}
+                        label={`Fecha evolución ${idx + 1}`}
+                        onChange={(fecha) => {
+                          onEdit((p) => {
+                            const next = [...p.evolucion];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", saldo: "", pago: "" });
+                            next[idx] = { ...next[idx], fecha };
+                            return { ...p, evolucion: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-left">
+                      <Cell
+                        value={row.tratamiento}
+                        label={`Tratamiento evolución ${idx + 1}`}
+                        onChange={(tratamiento) => {
+                          onEdit((p) => {
+                            const next = [...p.evolucion];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", saldo: "", pago: "" });
+                            next[idx] = { ...next[idx], tratamiento };
+                            return { ...p, evolucion: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.saldo}
+                        label={`Saldo evolución ${idx + 1}`}
+                        inputMode="decimal"
+                        onChange={(saldo) => {
+                          onEdit((p) => {
+                            const next = [...p.evolucion];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", saldo: "", pago: "" });
+                            next[idx] = { ...next[idx], saldo };
+                            return { ...p, evolucion: next };
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="border border-[#3b5998]/60 p-0 text-center">
+                      <Cell
+                        value={row.pago}
+                        label={`Pago evolución ${idx + 1}`}
+                        inputMode="decimal"
+                        onChange={(pago) => {
+                          onEdit((p) => {
+                            const next = [...p.evolucion];
+                            while (next.length <= idx) next.push({ fecha: "", tratamiento: "", saldo: "", pago: "" });
+                            next[idx] = { ...next[idx], pago };
+                            return { ...p, evolucion: next };
+                          });
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      </article>
+    </div>
   );
 }
