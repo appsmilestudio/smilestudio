@@ -38,7 +38,7 @@ export function People({
     }
     return map;
   }, [visits]);
-  // Búsqueda inteligente por tokens y flexibilidad fonética (S/Z, tildes, orden de nombres)
+  // Búsqueda inteligente por tokens y flexibilidad fonética (S/Z, B/V, C/S, tildes, orden de nombres)
   const rows = useMemo(() => {
     const rawQuery = query.trim();
     if (!rawQuery) {
@@ -47,11 +47,14 @@ export function People({
         .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
     }
 
-    const cleanTokens = fold(rawQuery)
+    const queryPhonetic = fold(rawQuery)
       .replace(/[,.-]/g, " ")
-      .split(/\s+/)
-      .filter(Boolean);
+      .replace(/z/g, "s")
+      .replace(/v/g, "b")
+      .replace(/ce/g, "se")
+      .replace(/ci/g, "si");
 
+    const cleanTokens = queryPhonetic.split(/\s+/).filter(Boolean);
     const queryDigits = rawQuery.replace(/\D/g, "");
 
     return patients
@@ -65,18 +68,18 @@ export function People({
         const patientDigits = patient.phone.replace(/\D/g, "");
         if (queryDigits.length >= 3 && patientDigits.includes(queryDigits)) return true;
 
-        // Búsqueda por Nombre / Apellidos (independiente del orden y tolerante a S/Z)
+        // Búsqueda por Nombre / Apellidos / Dirección
         if (cleanTokens.length > 0) {
-          const patientNormalized = fold(patient.fullName).replace(/[,.-]/g, " ");
-          const patientFoldedSZ = patientNormalized.replace(/z/g, "s");
+          const patientTarget = `${patient.fullName} ${patient.address || ""}`;
+          const targetPhonetic = fold(patientTarget)
+            .replace(/[,.-]/g, " ")
+            .replace(/z/g, "s")
+            .replace(/v/g, "b")
+            .replace(/ce/g, "se")
+            .replace(/ci/g, "si");
 
-          const matchesAllTokens = cleanTokens.every((token) => {
-            if (patientNormalized.includes(token)) return true;
-            const tokenSZ = token.replace(/z/g, "s");
-            return patientFoldedSZ.includes(tokenSZ);
-          });
-
-          if (matchesAllTokens) return true;
+          const matchesAll = cleanTokens.every((token) => targetPhonetic.includes(token));
+          if (matchesAll) return true;
         }
 
         return false;

@@ -41,7 +41,7 @@ function ConfirmPage() {
         <div className="rise mt-8 rounded-2xl border border-line bg-paper p-6 text-center shadow-card">
           <p className="text-base font-medium text-ink">Cita no encontrada</p>
           <p className="mt-2 text-sm text-muted">
-            Este enlace no corresponde a una cita vigente en este dispositivo.
+            Este enlace no corresponde a una cita vigente o ya ha sido actualizada.
           </p>
         </div>
       ) : null}

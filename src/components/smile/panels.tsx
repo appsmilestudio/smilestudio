@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { previewPathPrefix } from "@/lib/preview-path-prefix";
 import { cpeNumber, openReceipt } from "@/lib/smile/cpe";
 import {
@@ -31,7 +32,7 @@ import {
   type VisitStatus,
 } from "@/lib/smile/model";
 import { useSmileStore } from "@/lib/smile/store";
-import { sendCitaWhatsApp, clearWhatsAppConnection, saveWhatsAppConnection, testWhatsAppConnection, whatsappStatus, whatsappWebhookInfo } from "@/lib/smile/whatsapp";
+import { clearWhatsAppConnection, saveWhatsAppConnection, testWhatsAppConnection, whatsappStatus, whatsappWebhookInfo } from "@/lib/smile/whatsapp";
 import { applyPastedWhatsApp } from "@/lib/smile/apply-lead";
 import { Btn, Field, Pill, Sheet, inputClass } from "./ui";
 
@@ -43,22 +44,6 @@ export type Panel =
   | { kind: "morning"; date: string }
   | { kind: "new-patient" }
   | { kind: "meta" };
-
-function doctorLabel(id: DoctorId) {
-  return id === "miguel" ? "el Dr. Miguel" : "la Dra. Judith";
-}
-
-async function avisarCita(patient: Patient, visit: Visit) {
-  return sendCitaWhatsApp({
-    data: {
-      patientName: patient.fullName,
-      phone: patient.phone,
-      dateLabel: formatDay(visit.date),
-      timeLabel: visit.time ? formatTime(visit.time) : "por confirmar",
-      doctorLabel: doctorLabel(visit.doctorId),
-    },
-  });
-}
 
 function confirmUrl(id: string) {
   if (typeof window === "undefined") return "";
@@ -112,7 +97,6 @@ function VisitSheet({
   const [noCharge, setNoCharge] = useState(visit?.noCharge ?? false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [waBusy, setWaBusy] = useState(false);
   const [waNote, setWaNote] = useState("");
   const [askDelete, setAskDelete] = useState(false);
   const [method, setMethod] = useState<PayMethod>("efectivo");
@@ -236,39 +220,27 @@ function VisitSheet({
         {error ? <p className="text-sm text-alert">{error}</p> : null}
 
         <div className="flex flex-wrap gap-2">
-          <Btn
-            tone="moss"
-            disabled={waBusy}
-            onClick={() => {
-              setWaBusy(true);
-              setWaNote("");
-              void avisarCita(patient, visit).then((result) => {
-                setWaBusy(false);
-                if (result.ok) {
-                  setWaNote(result.message);
-                  if (visit.status === "agendada" || visit.status === "solicitud") {
-                    apply({ status: "recordatorio" });
-                  }
-                } else if (href) {
-                  // Fallback directo e instantáneo a WhatsApp Web / App
-                  window.open(href, "_blank", "noopener,noreferrer");
-                  setWaNote("✓ Abriendo WhatsApp con el recordatorio y link de confirmación listo para enviar.");
-                  if (visit.status === "agendada" || visit.status === "solicitud") {
-                    apply({ status: "recordatorio" });
-                  }
-                } else {
-                  setWaNote("El paciente no tiene un número de celular válido registrado.");
-                }
-              });
-            }}
-          >
-            {waBusy ? "Abriendo…" : "Avisar por WhatsApp"}
-          </Btn>
           {href ? (
-            <Btn tone="paper" onClick={() => window.open(href, "_blank", "noopener,noreferrer")}>
-              Abrir chat
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                if (visit.status === "agendada" || visit.status === "solicitud") {
+                  apply({ status: "recordatorio" });
+                }
+                setWaNote("✓ WhatsApp abierto con el mensaje listo. Presiona la flechita de 'Enviar' en WhatsApp para mandarlo.");
+              }}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[#25D366] px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-[#20ba59] active:scale-[0.98] transition cursor-pointer"
+            >
+              <MessageCircle className="size-4" />
+              Avisar por WhatsApp
+            </a>
+          ) : (
+            <Btn tone="paper" disabled>
+              Sin celular registrado
             </Btn>
-          ) : null}
+          )}
           <Btn
             tone="paper"
             onClick={() => {
@@ -1013,7 +985,6 @@ function MorningSheet({ date, onClose, onOpen }: { date: string; onClose: () => 
   const patients = useSmileStore((state) => state.patients);
   const moveVisit = useSmileStore((state) => state.moveVisit);
   const pending = allVisits.filter((visit) => visit.date === date && needsMorningPing(visit)).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState("Avisos directos al WhatsApp de cada paciente.");
 
@@ -1052,28 +1023,26 @@ function MorningSheet({ date, onClose, onOpen }: { date: string; onClose: () => 
                   </span>
                 </button>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <Btn
-                    tone="paper"
-                    disabled={busyId === visit.id}
-                    onClick={() => {
-                      setBusyId(visit.id);
-                      void avisarCita(patient, visit).then((result) => {
-                        setBusyId(null);
-                        if (result.ok) {
-                          setNotes((current) => ({ ...current, [visit.id]: result.message }));
-                          moveVisit(visit.id, { status: "recordatorio" });
-                        } else if (directHref) {
-                          window.open(directHref, "_blank", "noopener,noreferrer");
-                          setNotes((current) => ({ ...current, [visit.id]: "✓ WhatsApp abierto listo para enviar." }));
-                          moveVisit(visit.id, { status: "recordatorio" });
-                        } else {
-                          setNotes((current) => ({ ...current, [visit.id]: "Sin celular registrado." }));
-                        }
-                      });
-                    }}
-                  >
-                    {busyId === visit.id ? "Abriendo…" : "Avisar por WhatsApp"}
-                  </Btn>
+                  {directHref ? (
+                    <a
+                      href={directHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        moveVisit(visit.id, { status: "recordatorio" });
+                        setNotes((current) => ({
+                          ...current,
+                          [visit.id]: "✓ WhatsApp abierto listo para enviar.",
+                        }));
+                      }}
+                      className="inline-flex h-8 items-center justify-center gap-1 rounded-xl bg-[#25D366] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#20ba59] active:scale-95 transition cursor-pointer"
+                    >
+                      <MessageCircle className="size-3.5" />
+                      Avisar por WhatsApp
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted self-center">Sin celular</span>
+                  )}
                   <Btn onClick={() => moveVisit(visit.id, { status: "confirmada" })}>Ya confirmó</Btn>
                 </div>
                 {notes[visit.id] ? <p className="mt-2 text-sm text-muted">{notes[visit.id]}</p> : null}

@@ -11,7 +11,8 @@ import { HomeDashboard } from "./home";
 import { RoleSelector } from "./role-selector";
 import { ClinicApp } from "@/components/clinic/shell";
 import { applyWhatsAppLead } from "@/lib/smile/apply-lead";
-import { startLibroSync, useCloudStatus } from "@/lib/smile/cloud";
+import { startLibroSync, useCloudStatus, forceSync } from "@/lib/smile/cloud";
+import { RefreshCw } from "lucide-react";
 import { exportExcelWorkbook } from "@/lib/smile/excel";
 import { ackWhatsAppInbox, listWhatsAppInbox } from "@/lib/smile/whatsapp";
 import { Btn, DayNav } from "./ui";
@@ -48,7 +49,17 @@ export function SmileApp() {
   const [askReset, setAskReset] = useState(false);
   const [waNotice, setWaNotice] = useState("");
   const [ready, setReady] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
   const cloud = useCloudStatus();
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    const result = await forceSync();
+    setSyncing(false);
+    setSyncFeedback(result.ok ? "✓ Sincronizado" : "Error de red");
+    setTimeout(() => setSyncFeedback(null), 3500);
+  };
 
   useEffect(() => {
     void startLibroSync().finally(() => setReady(true));
@@ -106,7 +117,10 @@ export function SmileApp() {
               <div className="min-w-0">
                 <p className="truncate font-display text-2xl leading-none text-ink sm:text-3xl">Smile Studio</p>
                 <p className="mt-1 hidden truncate text-xs text-muted sm:block">Consultorio dental · Piura</p>
-                <p className={`truncate text-[11px] ${cloud.status === "conectado" ? "text-muted" : "text-gold-deep"}`}>{cloud.detail}</p>
+                <p className={`truncate text-[11px] flex items-center gap-1.5 ${cloud.status === "conectado" ? "text-moss font-medium" : "text-gold-deep"}`}>
+                  <span className={cn("size-1.5 rounded-full shrink-0", cloud.status === "conectado" ? "bg-moss" : "bg-gold animate-pulse")} />
+                  {cloud.detail}
+                </p>
               </div>
             </button>
             <nav
@@ -119,7 +133,17 @@ export function SmileApp() {
                 </TabButton>
               ))}
             </nav>
-            <div className="shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={syncing}
+                title="Sincronizar datos con la nube (laptop y celular)"
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1 text-xs font-medium text-ink shadow-sm hover:bg-cream active:scale-95 transition"
+              >
+                <RefreshCw className={cn("size-3.5 text-gold-deep", syncing && "animate-spin")} />
+                <span className="hidden sm:inline">{syncFeedback ?? (syncing ? "Sincronizando…" : "Sincronizar")}</span>
+              </button>
               <RoleSelector role={role} onChange={setRole} />
             </div>
           </div>

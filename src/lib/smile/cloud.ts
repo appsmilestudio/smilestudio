@@ -26,6 +26,7 @@ let applying = false;
 let dirty = false;
 let pushOk = true;
 let timer = 0;
+let syncLock = false;
 
 function setStatus(next: CloudStatus, text: string) {
   status = next;
@@ -35,6 +36,10 @@ function setStatus(next: CloudStatus, text: string) {
 
 export function cloudDetail() {
   return detail;
+}
+
+export function isCloudHealthy() {
+  return status === "conectado" && pushOk;
 }
 
 export function useCloudStatus() {
@@ -71,7 +76,47 @@ function libro(): Libro {
   };
 }
 
+/**
+ * Trae todos los registros de una tabla paginando en lotes de 1000
+ * para evitar el límite estándar de Supabase
+ */
+async function fetchAll(table: string): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await supabase.from(table).select("*").range(from, from + pageSize - 1);
+    if (error) {
+      if (missingTable(error)) throw error;
+      throw error;
+    }
+    if (!data || data.length === 0) break;
+    all.push(...(data as Record<string, unknown>[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+async function fetchAllColumn(table: string, column = "id"): Promise<string[]> {
+  const all: string[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await supabase.from(table).select(column).range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const row of data as unknown as Record<string, unknown>[]) {
+      all.push(String(row[column]));
+    }
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 async function upsert(table: string, rows: Record<string, unknown>[]) {
+  if (rows.length === 0) return;
   for (let index = 0; index < rows.length; index += 200) {
     const slice = rows.slice(index, index + 200);
     const { error } = await supabase.from(table).upsert(slice);
@@ -80,12 +125,10 @@ async function upsert(table: string, rows: Record<string, unknown>[]) {
 }
 
 async function retain(table: string, ids: string[], column = "id") {
-  const { data, error } = await supabase.from(table).select(column);
-  if (error) throw error;
+  if (ids.length === 0) return;
+  const allIds = await fetchAllColumn(table, column);
   const keep = new Set(ids);
-  const gone = (data ?? [])
-    .map((row) => String((row as unknown as Record<string, unknown>)[column]))
-    .filter((id) => !keep.has(id));
+  const gone = allIds.filter((id) => !keep.has(id));
   for (let index = 0; index < gone.length; index += 100) {
     const slice = gone.slice(index, index + 100);
     const { error: deleteError } = await supabase.from(table).delete().in(column, slice);
@@ -94,112 +137,121 @@ async function retain(table: string, ids: string[], column = "id") {
 }
 
 async function pullLibro(): Promise<Libro | "empty" | "missing"> {
-  const patients = await supabase.from("pacientes").select("*");
-  if (missingTable(patients.error)) return "missing";
-  if (patients.error) throw patients.error;
-  const [visits, payments, debts, closes, emisor, comprobantes] = await Promise.all([
-    supabase.from("citas").select("*"),
-    supabase.from("pagos").select("*"),
-    supabase.from("deudas").select("*"),
-    supabase.from("cierres").select("*"),
-    supabase.from("emisor").select("*").eq("id", 1).maybeSingle(),
-    supabase.from("comprobantes").select("*"),
-  ]);
-  for (const result of [visits, payments, debts, closes, comprobantes]) {
-    if (result.error) throw result.error;
-  }
-  if (emisor.error) throw emisor.error;
-  const patientRows = patients.data ?? [];
-  const visitRows = visits.data ?? [];
-  if (patientRows.length === 0 && visitRows.length === 0 && (debts.data ?? []).length === 0 && (comprobantes.data ?? []).length === 0) {
+  const testRes = await supabase.from("pacientes").select("id").limit(1);
+  if (missingTable(testRes.error)) return "missing";
+  if (testRes.error) throw testRes.error;
+
+  const [patientRows, visitRows, paymentRows, debtRows, closeRows, emisorRow, comprobanteRows] =
+    await Promise.all([
+      fetchAll("pacientes"),
+      fetchAll("citas"),
+      fetchAll("pagos"),
+      fetchAll("deudas"),
+      fetchAll("cierres"),
+      supabase.from("emisor").select("*").eq("id", 1).maybeSingle(),
+      fetchAll("comprobantes"),
+    ]);
+
+  if (emisorRow.error) throw emisorRow.error;
+
+  if (
+    patientRows.length === 0 &&
+    visitRows.length === 0 &&
+    debtRows.length === 0 &&
+    comprobanteRows.length === 0
+  ) {
     return "empty";
   }
+
   const byVisit = new Map<string, Payment[]>();
-  for (const row of payments.data ?? []) {
+  for (const row of paymentRows) {
     const payment: Payment = {
       id: String(row.id),
-      method: row.metodo,
+      method: row.metodo as Payment["method"],
       amount: num(row.monto),
-      operation: row.operacion ?? "",
-      note: row.nota ?? "",
+      operation: String(row.operacion ?? ""),
+      note: String(row.nota ?? ""),
       hasEvidence: Boolean(row.tiene_evidencia),
-      evidence: row.evidencia ?? undefined,
+      evidence: row.evidencia ? String(row.evidencia) : undefined,
     };
     const list = byVisit.get(String(row.cita_id)) ?? [];
     list.push(payment);
     byVisit.set(String(row.cita_id), list);
   }
+
   const closeMap: Record<string, DayClose> = {};
-  for (const row of closes.data ?? []) {
+  for (const row of closeRows) {
     closeMap[String(row.fecha)] = {
       cashCounted: row.efectivo_contado == null ? null : num(row.efectivo_contado),
-      note: row.nota ?? "",
-      closedAt: row.cerrado_en,
+      note: String(row.nota ?? ""),
+      closedAt: row.cerrado_en ? String(row.cerrado_en) : null,
     };
   }
-  const emisorRow = emisor.data;
+
+  const emisorData = emisorRow.data;
+
   return {
     patients: patientRows.map((row) => ({
       id: String(row.id),
-      fullName: row.nombre ?? "",
-      age: row.edad ?? "",
-      dni: row.dni ?? "",
-      phone: row.telefono ?? "",
-      address: row.direccion ?? "",
+      fullName: String(row.nombre ?? ""),
+      age: String(row.edad ?? ""),
+      dni: String(row.dni ?? ""),
+      phone: String(row.telefono ?? ""),
+      address: String(row.direccion ?? ""),
     })),
     visits: visitRows.map((row) => ({
       id: String(row.id),
       patientId: String(row.paciente_id),
-      doctorId: row.doctor,
+      doctorId: row.doctor as Visit["doctorId"],
       date: String(row.fecha),
-      time: row.hora,
-      treatment: row.tratamiento ?? "",
-      status: row.estado,
+      time: row.hora ? String(row.hora) : null,
+      treatment: String(row.tratamiento ?? ""),
+      status: row.estado as Visit["status"],
       payments: byVisit.get(String(row.id)) ?? [],
-      monthTag: row.mes ?? "",
-      note: row.nota ?? "",
-      source: row.origen ?? "agenda",
+      monthTag: String(row.mes ?? ""),
+      note: String(row.nota ?? ""),
+      source: (row.origen as Visit["source"]) ?? "agenda",
       noCharge: Boolean(row.sin_cobro),
     })),
-    debts: (debts.data ?? []).map((row) => ({
+    debts: debtRows.map((row) => ({
       id: String(row.id),
       patientId: String(row.paciente_id),
       amount: num(row.monto),
-      concept: row.concepto ?? "",
-      status: row.estado,
+      concept: String(row.concepto ?? ""),
+      status: row.estado as Debt["status"],
     })),
     closes: closeMap,
-    emisor: emisorRow
+    emisor: emisorData
       ? {
-          ruc: emisorRow.ruc ?? "",
-          razonSocial: emisorRow.razon_social ?? "Smile Studio",
-          direccion: emisorRow.direccion ?? "Piura",
-          nextBoleta: num(emisorRow.siguiente_boleta) || 1,
-          nextFactura: num(emisorRow.siguiente_factura) || 1,
+          ruc: String(emisorData.ruc ?? ""),
+          razonSocial: String(emisorData.razon_social ?? "Smile Studio"),
+          direccion: String(emisorData.direccion ?? "Piura"),
+          nextBoleta: num(emisorData.siguiente_boleta) || 1,
+          nextFactura: num(emisorData.siguiente_factura) || 1,
         }
       : defaultEmisor(),
-    comprobantes: (comprobantes.data ?? []).map((row) => ({
+    comprobantes: comprobanteRows.map((row) => ({
       id: String(row.id),
       visitId: String(row.cita_id),
-      paymentIds: row.pago_ids ?? [],
-      tipo: row.tipo,
-      serie: row.serie,
+      paymentIds: (row.pago_ids as string[]) ?? [],
+      tipo: row.tipo as Comprobante["tipo"],
+      serie: row.serie as Comprobante["serie"],
       numero: num(row.numero),
       fechaEmision: String(row.fecha),
-      receptorNombre: row.receptor ?? "",
-      tipoDoc: row.tipo_doc,
-      numDoc: row.num_doc ?? "",
-      descripcion: row.descripcion ?? "",
+      receptorNombre: String(row.receptor ?? ""),
+      tipoDoc: row.tipo_doc as Comprobante["tipoDoc"],
+      numDoc: String(row.num_doc ?? ""),
+      descripcion: String(row.descripcion ?? ""),
       opGravada: num(row.op_gravada),
       igv: num(row.igv),
       total: num(row.total),
-      status: row.estado,
+      status: row.estado as Comprobante["status"],
       leyenda: LEYENDA,
     })),
   };
 }
 
-async function pushLibro(snapshot = libro()) {
+export async function pushLibro(snapshot = libro()) {
   const payments = snapshot.visits.flatMap((visit) =>
     visit.payments.map((payment) => ({
       id: payment.id,
@@ -212,6 +264,7 @@ async function pushLibro(snapshot = libro()) {
       evidencia: payment.evidence ?? null,
     })),
   );
+
   await upsert(
     "pacientes",
     snapshot.patients.map((patient) => ({
@@ -223,6 +276,7 @@ async function pushLibro(snapshot = libro()) {
       direccion: patient.address,
     })),
   );
+
   await upsert(
     "citas",
     snapshot.visits.map((visit) => ({
@@ -239,7 +293,9 @@ async function pushLibro(snapshot = libro()) {
       sin_cobro: visit.noCharge,
     })),
   );
+
   await upsert("pagos", payments);
+
   await upsert(
     "deudas",
     snapshot.debts.map((debt) => ({
@@ -250,6 +306,7 @@ async function pushLibro(snapshot = libro()) {
       estado: debt.status,
     })),
   );
+
   await upsert(
     "cierres",
     Object.entries(snapshot.closes).map(([fecha, close]) => ({
@@ -259,6 +316,7 @@ async function pushLibro(snapshot = libro()) {
       cerrado_en: close.closedAt,
     })),
   );
+
   await upsert("emisor", [
     {
       id: 1,
@@ -269,6 +327,7 @@ async function pushLibro(snapshot = libro()) {
       siguiente_factura: snapshot.emisor.nextFactura,
     },
   ]);
+
   await upsert(
     "comprobantes",
     snapshot.comprobantes.map((item) => ({
@@ -290,6 +349,8 @@ async function pushLibro(snapshot = libro()) {
       leyenda: item.leyenda,
     })),
   );
+
+  // Retener únicamente eliminaciones consistentes
   await retain("pagos", payments.map((payment) => payment.id));
   await retain("comprobantes", snapshot.comprobantes.map((item) => item.id));
   await retain("citas", snapshot.visits.map((visit) => visit.id));
@@ -298,19 +359,110 @@ async function pushLibro(snapshot = libro()) {
   await retain("cierres", Object.keys(snapshot.closes), "fecha");
 }
 
-function applyLibro(snapshot: Libro) {
+/**
+ * Estrategia de fusión inteligente para sincronización entre dispositivos:
+ * Preserva pacientes, citas y deudas creados localmente que aún no están en la nube.
+ */
+function mergeLibro(remote: Libro) {
+  const local = useSmileStore.getState();
+
+  const patientMap = new Map<string, Patient>();
+  for (const rp of remote.patients) patientMap.set(rp.id, rp);
+  for (const lp of local.patients) {
+    if (!patientMap.has(lp.id)) patientMap.set(lp.id, lp);
+  }
+
+  const visitMap = new Map<string, Visit>();
+  for (const rv of remote.visits) visitMap.set(rv.id, rv);
+  for (const lv of local.visits) {
+    if (!visitMap.has(lv.id)) visitMap.set(lv.id, lv);
+  }
+
+  const debtMap = new Map<string, Debt>();
+  for (const rd of remote.debts) debtMap.set(rd.id, rd);
+  for (const ld of local.debts) {
+    if (!debtMap.has(ld.id)) debtMap.set(ld.id, ld);
+  }
+
+  const mergedPatients = Array.from(patientMap.values());
+  const mergedVisits = Array.from(visitMap.values());
+  const mergedDebts = Array.from(debtMap.values());
+
   applying = true;
-  useSmileStore.setState(snapshot);
+  useSmileStore.setState({
+    patients: mergedPatients,
+    visits: mergedVisits,
+    debts: mergedDebts,
+    closes: { ...remote.closes, ...local.closes },
+    emisor: remote.emisor || local.emisor,
+    comprobantes: remote.comprobantes.length > 0 ? remote.comprobantes : local.comprobantes,
+  });
   applying = false;
 }
 
 async function refreshLibro() {
-  if (dirty || applying || status !== "conectado" || !pushOk) return;
-  const remote = await pullLibro();
-  if (remote === "missing" || remote === "empty") return;
-  applying = true;
-  useSmileStore.setState(remote);
-  applying = false;
+  if (dirty || applying || syncLock) return;
+  try {
+    const remote = await pullLibro();
+    if (remote === "missing" || remote === "empty") return;
+    mergeLibro(remote);
+    const count = useSmileStore.getState().patients.length;
+    setStatus("conectado", `Base en línea (${count} pacientes)`);
+  } catch (err) {
+    console.warn("Error en auto-refresco:", err);
+  }
+}
+
+async function syncDirty(retries = 3) {
+  if (!dirty || applying || syncLock) return;
+  syncLock = true;
+  try {
+    const snapshot = libro();
+    await pushLibro(snapshot);
+    dirty = false;
+    pushOk = true;
+    const count = snapshot.patients.length;
+    setStatus("conectado", `Base en línea (${count} pacientes)`);
+  } catch (err) {
+    console.error("Error al guardar en Supabase:", err);
+    if (retries > 0) {
+      setStatus("conectando", "Reintentando sincronizar…");
+      window.setTimeout(() => {
+        syncLock = false;
+        void syncDirty(retries - 1);
+      }, 2500);
+      return;
+    }
+    pushOk = false;
+    setStatus("error", "No se pudo guardar en la base");
+  } finally {
+    syncLock = false;
+  }
+}
+
+/**
+ * Función pública para forzar sincronización instantánea desde cualquier vista
+ */
+export async function forceSync(): Promise<{ ok: boolean; message: string }> {
+  try {
+    setStatus("conectando", "Sincronizando con la nube…");
+    const snapshot = libro();
+    await pushLibro(snapshot);
+    const remote = await pullLibro();
+    if (remote !== "missing" && remote !== "empty") {
+      mergeLibro(remote);
+    }
+    dirty = false;
+    pushOk = true;
+    const count = useSmileStore.getState().patients.length;
+    setStatus("conectado", `Base en línea (${count} pacientes)`);
+    return { ok: true, message: `Sincronizado con éxito (${count} pacientes en línea).` };
+  } catch (err) {
+    console.error("Error al forzar sincronización:", err);
+    pushOk = false;
+    setStatus("error", "Error de conexión con la nube");
+    return { ok: false, message: "No se pudo sincronizar. Comprueba tu conexión a internet." };
+  }
 }
 
 async function bootLibro() {
@@ -322,36 +474,60 @@ async function bootLibro() {
       setStatus("sin_tablas", "Falta crear las tablas en Supabase");
       return;
     }
-    if (remote === "empty") await pushLibro();
-    else applyLibro(remote);
+    if (remote === "empty") {
+      await pushLibro();
+    } else {
+      mergeLibro(remote);
+      // Si local tenía elementos que remote no tenía, subirlos
+      if (useSmileStore.getState().patients.length > remote.patients.length) {
+        void pushLibro();
+      }
+    }
     pushOk = true;
-    setStatus("conectado", "Base en línea");
-  } catch {
+    const count = useSmileStore.getState().patients.length;
+    setStatus("conectado", `Base en línea (${count} pacientes)`);
+  } catch (err) {
+    console.error("Error boot libro:", err);
     pushOk = false;
     setStatus("error", "La base no respondió");
     return;
   }
+
+  // Suscriptor al estado local con autoguardado y reintento
   useSmileStore.subscribe(() => {
-    if (applying || status !== "conectado") return;
+    if (applying) return;
     dirty = true;
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      const snapshot = libro();
-      void pushLibro(snapshot)
-        .then(() => {
-          dirty = false;
-          pushOk = true;
-          setStatus("conectado", "Base en línea");
-        })
-        .catch(() => {
-          pushOk = false;
-          setStatus("error", "No se pudo guardar en la base");
-        });
+      void syncDirty();
     }, 800);
   });
+
+  // Polling de seguridad cada 15 segundos
   window.setInterval(() => {
     void refreshLibro().catch(() => undefined);
-  }, 20000);
+  }, 15000);
+
+  // Supabase Realtime para actualización instantánea multi-dispositivo (Laptop <-> Celular)
+  try {
+    supabase
+      .channel("smile-realtime-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => {
+        void refreshLibro();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "citas" }, () => {
+        void refreshLibro();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "pagos" }, () => {
+        void refreshLibro();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "deudas" }, () => {
+        void refreshLibro();
+      })
+      .subscribe();
+  } catch (err) {
+    console.warn("Realtime no disponible en este cliente:", err);
+  }
 }
 
 export function startLibroSync() {
@@ -371,6 +547,7 @@ async function pullFichas(): Promise<Ficha[] | "empty" | "missing"> {
 }
 
 async function pushFichas(patients: Ficha[]) {
+  if (patients.length === 0) return;
   await upsert(
     "fichas",
     patients.map((patient) => ({ id: patient.id, datos: patient })),
@@ -383,16 +560,31 @@ async function bootFichas() {
   await useClinic.persist.rehydrate();
   try {
     const remote = await pullFichas();
-    if (remote === "missing") return;
-    if (remote === "empty") await pushFichas(useClinic.getState().patients);
-    else {
-      applying = true;
-      useClinic.setState({ patients: remote, activeId: useClinic.getState().activeId ?? remote[0]?.id ?? null });
-      applying = false;
+    if (remote !== "missing") {
+      if (remote === "empty") {
+        await pushFichas(useClinic.getState().patients);
+      } else {
+        // Fusión de fichas
+        const local = useClinic.getState().patients;
+        const fichaMap = new Map<string, Ficha>();
+        for (const rf of remote) fichaMap.set(rf.id, rf);
+        for (const lf of local) {
+          if (!fichaMap.has(lf.id)) fichaMap.set(lf.id, lf);
+        }
+        const merged = Array.from(fichaMap.values());
+        applying = true;
+        useClinic.setState({
+          patients: merged,
+          activeId: useClinic.getState().activeId ?? merged[0]?.id ?? null,
+        });
+        applying = false;
+      }
     }
-  } catch {
+  } catch (err) {
+    console.warn("Fichas sync init:", err);
     return;
   }
+
   let fichaTimer = 0;
   useClinic.subscribe((state) => {
     if (applying) return;
