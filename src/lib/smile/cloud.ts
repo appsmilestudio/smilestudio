@@ -375,7 +375,22 @@ function mergeLibro(remote: Libro) {
   const visitMap = new Map<string, Visit>();
   for (const rv of remote.visits) visitMap.set(rv.id, rv);
   for (const lv of local.visits) {
-    if (!visitMap.has(lv.id)) visitMap.set(lv.id, lv);
+    const existing = visitMap.get(lv.id);
+    if (!existing) {
+      visitMap.set(lv.id, lv);
+    } else {
+      const payMap = new Map<string, Payment>();
+      for (const p of existing.payments) payMap.set(p.id, p);
+      for (const p of lv.payments) payMap.set(p.id, p);
+      visitMap.set(lv.id, {
+        ...existing,
+        ...lv,
+        payments: Array.from(payMap.values()),
+        treatment: lv.treatment || existing.treatment,
+        note: lv.note || existing.note,
+        status: lv.status !== "solicitud" ? lv.status : existing.status,
+      });
+    }
   }
 
   const debtMap = new Map<string, Debt>();
@@ -478,10 +493,8 @@ async function bootLibro() {
       await pushLibro();
     } else {
       mergeLibro(remote);
-      // Si local tenía elementos que remote no tenía, subirlos
-      if (useSmileStore.getState().patients.length > remote.patients.length) {
-        void pushLibro();
-      }
+      // Garantizar que cualquier dato creado hoy en local se suba a Supabase
+      void pushLibro();
     }
     pushOk = true;
     const count = useSmileStore.getState().patients.length;
